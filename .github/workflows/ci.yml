@@ -56,3 +56,6 @@ jobs:
       - name: Read-only SDK preflight
         run: npm run preflight
 
+      - name: Check market minimums against live books (read-only)
+        run: npx tsx scripts/inspect-market-minimums.ts
+
