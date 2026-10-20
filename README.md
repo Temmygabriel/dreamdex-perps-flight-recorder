@@ -1,8 +1,10 @@
-# Perps Flight Recorder
+# OrderProof — dreamDEX Perps
 
-**A testnet-first order checker and evidence recorder for dreamDEX perpetual futures.**
+**Check your order. Prove what happened.**
 
-Perps Flight Recorder helps a trader or builder see whether a proposed order follows the live market's rules, then preserves proof of what happened during a real testnet order attempt.
+OrderProof is a testnet-first order checker and evidence recorder for dreamDEX perpetual futures. It helps a trader or builder check a proposed order against live rules, submit a wallet-approved testnet order, cancel it, and save evidence that the lifecycle was verified.
+
+OrderProof makes a technical workflow understandable: check the rules, place one small testnet order, cancel it, and save a receipt with the transaction hashes and read-back checks.
 
 It is built for the dreamDEX Perps Builder Bounty on Somnia Tokyo/Hideki testnet (chain ID `50383`).
 
@@ -11,7 +13,7 @@ It is built for the dreamDEX Perps Builder Bounty on Somnia Tokyo/Hideki testnet
 1. **Reads live markets.** Shows markets and the correct price tick, size step, minimum size and decimal precision returned by dreamDEX's SDK.
 2. **Checks an intended order.** Checks the price and quantity against market rules, then calls the SDK's live order-size preflight for the chosen account.
 3. **Explains a block.** Makes an invalid price/size, stale mark or account-size limit visible before the user attempts a trade.
-4. **Records evidence.** The web app connects to a browser wallet, asks for a separate confirmation before sending a post-only testnet order, reads back the order state, lets the user cancel it, and downloads the transaction hashes and read-back result as a JSON receipt.
+4. **Records evidence.** The OrderProof web app connects to a browser wallet, asks for a separate confirmation before sending a post-only testnet order, reads back the order state, lets the user cancel it, and downloads the transaction hashes and read-back result as a JSON receipt.
 
 A preflight pass does **not** guarantee a transaction will later succeed. Market prices, order-book depth and account state can change.
 
@@ -74,7 +76,7 @@ The bot private key must not be the key for your regular wallet. Never store it 
 1. Open the Actions tab of this repository and select **Live testnet smoke**.
 2. Choose the market and side, keep the notional at `20` paper USDso or less, and leave confirmation as `NO` until the owner/key setup has been verified.
 3. Only after checking the correct testnet bot key and account, select `YES` and run the workflow.
-4. Open the run's **Artifacts** section and download `perps-flight-recorder-live-testnet-receipt`.
+4. Open the run's **Artifacts** section and download `orderproof-live-testnet-receipt`.
 5. The result is only verified if its receipt says the resting order was visible after placement and absent after cancellation. If a cancellation fails, inspect the testnet account's open orders before trying again.
 
 ## Deploy the web app on Vercel
