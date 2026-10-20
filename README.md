@@ -2,9 +2,9 @@
 
 **Check your order. Prove what happened.**
 
-OrderProof is a testnet-first order checker and evidence recorder for dreamDEX perpetual futures. It helps a trader or builder check a proposed order against live rules, submit a wallet-approved testnet order, cancel it, and save evidence that the lifecycle was verified.
+OrderProof is a testnet debugging workbench for dreamDEX Perps builders, integrators and bug reporters. Its job is to make an order problem reproducible: inspect live market and account rules, save the exact pass/block response, and—when a live test is justified and explicitly approved—record a testnet order, cancellation and read-back result.
 
-OrderProof makes a technical workflow understandable: check the rules, place one small testnet order, cancel it, and save a receipt with the transaction hashes and read-back checks.
+It is **not intended as a daily consumer trading app**. Traders already have dreamDEX's own interface; SDK builders and testers are the people most likely to return to OrderProof while integrating, debugging and documenting edge cases. The product's value depends on diagnostic exports that explain failures as well as receipts that record successful runs.
 
 It is built for the dreamDEX Perps Builder Bounty on Somnia Tokyo/Hideki testnet (chain ID `50383`).
 
@@ -13,7 +13,7 @@ It is built for the dreamDEX Perps Builder Bounty on Somnia Tokyo/Hideki testnet
 1. **Reads live markets.** Shows markets and the correct price tick, size step, minimum size and decimal precision returned by dreamDEX's SDK.
 2. **Checks an intended order.** Checks the price and quantity against market rules, then calls the SDK's live order-size preflight for the chosen account.
 3. **Explains a block.** Makes an invalid price/size, stale mark or account-size limit visible before the user attempts a trade.
-4. **Records evidence.** The OrderProof web app connects to a browser wallet, asks for a separate confirmation before sending a post-only testnet order, reads back the order state, lets the user cancel it, and downloads the transaction hashes and read-back result as a JSON receipt.
+4. **Exports diagnostics and evidence.** A blocked or passing read-only preflight can be saved as a JSON diagnostic. When the user chooses to run a test, the browser wallet authorizes a post-only testnet order; OrderProof records transaction hashes, reads the open-order state, supports cancellation, and saves a JSON receipt.
 
 A preflight pass does **not** guarantee a transaction will later succeed. Market prices, order-book depth and account state can change.
 
@@ -39,13 +39,15 @@ OrderProof is an independent community project, not the official dreamDEX websit
 - [x] Read-only SDK connection reached Hideki testnet and returned 21 live perps markets (20 October 2026).
 - [x] Read-only order-size response checked on-chain using a dummy account; no private key was used.
 - [x] Wallet-connected trading flow added: browser wallet signing only, latest preflight before sending, post-only order, cancellation and read-back receipt.
+- [x] Read-only preflight diagnostics can now be exported even when a request is blocked.
+- [x] Feedback track test matrix added at [feedback/TEST_MATRIX.md](feedback/TEST_MATRIX.md); every candidate remains untested until reproducible evidence exists.
 - [x] Production Vite build passes in GitHub Actions.
 - [x] Read-only market-minimum audit confirms BTC, ETH, XRP and SOL minimum orders fit within a 20 paper-USDso test budget at the time of the check.
 - [ ] Complete a real testnet order/cancel/read-back run using the user's connected wallet.
 - [ ] Deploy and check the public Vercel app.
 - [ ] Publish 2–3 X posts tagging `@DreamDEXSomnia`, then add their links here before bounty submission.
 
-No real order has yet been sent by this repository's browser flow. The live-trade stage is still unverified until you connect your testnet wallet, place and cancel an order, and download a receipt whose read-back checks pass.
+No real order has yet been sent by this repository's browser flow. The live-trade stage is still unverified until a funded testnet account completes one order/cancel/read-back run. No dreamDEX bug has yet been confirmed by this project; the Feedback track file is a test plan, not a set of bug claims. Imported receipt JSON is only inspected locally and is not independently re-verified against the blockchain by the import viewer.
 
 ## Network and cost
 
