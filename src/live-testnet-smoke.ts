@@ -354,6 +354,43 @@ async function main(): Promise<void> {
     console.log("LIVE SMOKE TEST PASSED: placement, cancellation, and read-back checks passed.");
   } catch (error) {
     errorText = error instanceof Error ? error.message : String(error);
+
+    // If placement succeeded but a later decode/read-back check failed, make
+    // one best-effort cancellation attempt before exiting. Never knowingly
+    // leave the smoke-test's resting order on the book because a verifier
+    // failed. Keep the cleanup result in the evidence file.
+    let emergencyCleanup: { hash: string; status: string } | undefined;
+    let emergencyCleanupError: string | undefined;
+    if (placementReceipt && orderIdText && !cancellationReceipt) {
+      try {
+        const poolForCleanup = (await exchange.client.listPerpMarkets() as any[])
+          .find((row: any) => String(row.baseSymbol).toUpperCase() === baseSymbol)?.poolAddress as `0x${string}` | undefined;
+        if (!poolForCleanup) throw new Error("Could not re-resolve the market pool for emergency cancellation.");
+        const { request: emergencyRequest } = await publicClient.simulateContract({
+          address: poolForCleanup,
+          abi: poolAbi,
+          functionName: "cancelOrderFor",
+          args: [owner, BigInt(orderIdText)],
+          account: botAccount,
+          gas: GAS_LIMIT,
+        });
+        const emergencyHash = await walletClient.writeContract(emergencyRequest as never);
+        const emergencyReceipt = await publicClient.waitForTransactionReceipt({ hash: emergencyHash });
+        emergencyCleanup = { hash: emergencyHash, status: String(emergencyReceipt.status) };
+        if (emergencyReceipt.status !== "success") {
+          emergencyCleanupError = "Emergency cancellation transaction reverted. Check open orders in dreamDEX immediately.";
+        } else {
+          cancellationReceipt = {
+            status: String(emergencyReceipt.status),
+            hash: emergencyHash,
+            blockNumber: String(emergencyReceipt.blockNumber),
+          };
+        }
+      } catch (cleanupError) {
+        emergencyCleanupError = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+      }
+    }
+
     const partialRecord = {
       product: "Perps Flight Recorder",
       recordedAt: new Date().toISOString(),
@@ -361,6 +398,8 @@ async function main(): Promise<void> {
       placement: placementReceipt ?? null,
       cancellation: cancellationReceipt ?? null,
       orderId: orderIdText ?? null,
+      emergencyCleanup: emergencyCleanup ?? null,
+      emergencyCleanupError: emergencyCleanupError ?? null,
       verification: {
         restingOrderWasVisibleAfterPlacement: visibleAfterPlacement,
         restingOrderWasAbsentAfterCancellation: absentAfterCancellation,
