@@ -137,8 +137,12 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     }
 
     const placeable = max.placeable && quantity <= max.maxQuantity;
+    const limitKey = String(max.limitedBy ?? "none");
+    const isWalletBalanceLimited = /walletbalance/i.test(limitKey);
     const failure = !max.placeable
-      ? `The protocol says this account cannot open/increase this position right now: ${String(max.limitedBy)}.`
+      ? isWalletBalanceLimited
+        ? "No usable USDso margin is available to the address checked. Make sure this is the DreamDEX trading-wallet address that holds your Perps margin—not a different sign-in wallet. In the official testnet app, join Perps Arena to receive the paper USDso allocation; if it is in Spot, move it to Perps using Perps ⇆ Spot. STT pays gas; USDso is trading margin. Then run this check again. No transaction was sent."
+        : `The protocol says this account cannot open/increase this position right now: ${limitKey}. Check the official testnet app for the account's available Perps margin and market eligibility. No transaction was sent.`
       : quantity > max.maxQuantity
         ? "The requested quantity is larger than the protocol's current maximum for this account."
         : undefined;
