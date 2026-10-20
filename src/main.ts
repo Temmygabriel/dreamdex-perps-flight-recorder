@@ -94,6 +94,16 @@ type OrderEvidence = {
 type State = {
   markets: Market[];
   walletAddress?: Address;
+  lastQuote?: {
+    symbol: string;
+    bestBid: string;
+    bestAsk: string;
+    longPrice: string;
+    shortPrice: string;
+    minQuantity: string;
+    longMinimumNotional: string;
+    shortMinimumNotional: string;
+  };
   activeOrder?: {
     id: string;
     market: Market;
@@ -222,7 +232,12 @@ async function loadMarkets(): Promise<void> {
         option.textContent = `${market.baseSymbol} / ${market.quoteSymbol}`;
         select.appendChild(option);
       });
-    if (previous && state.markets.some((item) => item.symbol === previous)) select.value = previous;
+    if (previous && state.markets.some((item) => item.symbol === previous)) {
+      select.value = previous;
+    } else {
+      const btc = state.markets.find((item) => item.baseSymbol.toUpperCase() === "BTC");
+      if (btc) select.value = btc.symbol;
+    }
     select.disabled = state.markets.length === 0;
     $("#market-count").textContent = String(state.markets.length);
     showMarketRules();
@@ -260,6 +275,39 @@ async function requestTestnetNetwork(provider: Eip1193Provider): Promise<void> {
   const checked = String(await provider.request({ method: "eth_chainId" })).toLowerCase();
   if (checked !== CHAIN_ID_HEX) {
     throw new Error("Your wallet did not switch to chain 50383. No transaction was sent.");
+  }
+}
+
+
+async function fillLiveQuote(): Promise<void> {
+  const market = currentMarket();
+  if (!market) throw new Error("Select a market first.");
+  const button = $("#fill-live-quote") as HTMLButtonElement;
+  const status = $("#quote-status");
+  button.disabled = true;
+  button.textContent = "Reading current book…";
+  status.textContent = "Fetching a fresh bid/ask and the market's minimum size. No transaction is sent.";
+  try {
+    const response = await fetch(`/api/quote?symbol=${encodeURIComponent(market.symbol)}`, { cache: "no-store" });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || "Could not fetch a live quote.");
+    state.lastQuote = result.market;
+    const side = ($("#side-select") as HTMLSelectElement).value;
+    const suggestedPrice = side === "short" ? result.market.shortPrice : result.market.longPrice;
+    const estimatedNotional = side === "short" ? result.market.shortMinimumNotional : result.market.longMinimumNotional;
+    ($("#price-input") as HTMLInputElement).value = String(suggestedPrice);
+    ($("#quantity-input") as HTMLInputElement).value = String(result.market.minQuantity);
+    invalidatePreflightOnEdit();
+    status.textContent =
+      `Fresh book · bid ${result.market.bestBid} / ask ${result.market.bestAsk}. Filled ${side === "short" ? "sell/short" : "buy/long"} price ${suggestedPrice} and minimum size ${result.market.minQuantity} ${market.baseSymbol}; estimated minimum order value ${estimatedNotional} paper USDso. Re-run preflight before sending.`;
+    setStatus("Live quote loaded. It can move, so run preflight immediately before placing an order.", "success");
+  } catch (error) {
+    state.lastQuote = undefined;
+    status.textContent = error instanceof Error ? error.message : String(error);
+    setStatus(status.textContent, "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Fill live quote + minimum size ↻";
   }
 }
 
@@ -857,11 +905,26 @@ for (const selector of ["#account-address", "#market-select", "#side-select", "#
   $(selector).addEventListener("change", invalidatePreflightOnEdit);
 }
 
+$("#fill-live-quote").addEventListener("click", () => {
+  fillLiveQuote().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    $("#quote-status").textContent = message;
+    setStatus(message, "error");
+  });
+});
 $("#connect-wallet").addEventListener("click", () => {
   connectWallet().catch((error) => setStatus(error instanceof Error ? error.message : String(error), "error"));
 });
 $("#refresh-markets").addEventListener("click", () => loadMarkets());
-$("#market-select").addEventListener("change", showMarketRules);
+$("#market-select").addEventListener("change", () => {
+  state.lastQuote = undefined;
+  $("#quote-status").textContent = "Market changed. Get a fresh quote before running preflight.";
+  showMarketRules();
+});
+$("#side-select").addEventListener("change", () => {
+  state.lastQuote = undefined;
+  $("#quote-status").textContent = "Side changed. Get a fresh quote so the suggested price matches the selected side.";
+});
 $("#preflight-form").addEventListener("submit", (event) => {
   handlePreflight(event as SubmitEvent).catch((error) => setStatus(error instanceof Error ? error.message : String(error), "error"));
 });
