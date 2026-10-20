@@ -43,7 +43,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: dreamdex-live-testnet-smoke
+  group: orderproof-live-testnet-smoke
   cancel-in-progress: false
 
 jobs:
@@ -92,7 +92,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: perps-flight-recorder-live-testnet-receipt
+          name: orderproof-live-testnet-receipt
           path: artifacts/live-testnet-smoke.json
           if-no-files-found: ignore
           retention-days: 30
