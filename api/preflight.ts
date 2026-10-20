@@ -108,7 +108,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       account: account as `0x${string}`,
       isBid: side === "long",
       price,
-      autoPull: false,
+      autoPull: true,
     });
 
     // PerpMaxOrderSize is a discriminated union. When priceable is false the
