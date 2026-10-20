@@ -32,9 +32,9 @@ function showMarketRules() {
   }
   $("#quantity-unit").textContent = market.baseSymbol;
   el.textContent =
-    `Live limits · tick ${prettyNumber(Number(market.tickSizeRaw) / 10 ** market.quoteDecimals)} USDso · ` +
-    `lot ${prettyNumber(Number(market.lotSizeRaw) / 10 ** market.baseDecimals)} ${market.baseSymbol} · ` +
-    `minimum ${prettyNumber(Number(market.minQuantityRaw) / 10 ** market.baseDecimals)} ${market.baseSymbol} · ` +
+    `Live limits · tick ${market.tickSize} USDso · ` +
+    `lot ${market.lotSize} ${market.baseSymbol} · ` +
+    `minimum ${market.minQuantity} ${market.baseSymbol} · ` +
     `quantity decimals ${market.baseDecimals}`;
 }
 
