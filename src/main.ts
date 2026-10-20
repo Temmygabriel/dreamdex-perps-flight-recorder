@@ -402,6 +402,7 @@ function renderPreflight(result: any): void {
   const details = $("#preflight-details");
   details.replaceChildren();
   const rows: Array<[string, string]> = [];
+  rows.push(["Account checked", safeText(result.account ?? formPayload().accountAddress)]);
   if (result.market) {
     rows.push(["Market", safeText(result.market.symbol)]);
     if (result.market.tickSize) rows.push(["Tick size", safeText(result.market.tickSize)]);
@@ -528,7 +529,7 @@ function saveEvidence(): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "perps-flight-recorder-receipt.json";
+  link.download = "orderproof-evidence-receipt.json";
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -691,7 +692,7 @@ async function placeOrder(): Promise<void> {
     };
 
     state.evidence = {
-      product: "Perps Flight Recorder",
+      product: "OrderProof",
       recordedAt: new Date().toISOString(),
       network: { name: "Somnia Hideki / Tokyo testnet", chainId: CHAIN_ID },
       sdkVersion: "0.32.1",
