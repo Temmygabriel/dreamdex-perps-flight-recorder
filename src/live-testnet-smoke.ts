@@ -309,7 +309,7 @@ async function main(): Promise<void> {
     }
 
     const record = {
-      product: "Perps Flight Recorder",
+      product: "OrderProof",
       recordedAt: new Date().toISOString(),
       sdkVersion: "0.32.1",
       network: { name: "Somnia Hideki / Tokyo testnet", chainId: 50383 },
@@ -392,7 +392,7 @@ async function main(): Promise<void> {
     }
 
     const partialRecord = {
-      product: "Perps Flight Recorder",
+      product: "OrderProof",
       recordedAt: new Date().toISOString(),
       network: { name: "Somnia Hideki / Tokyo testnet", chainId: 50383 },
       placement: placementReceipt ?? null,
