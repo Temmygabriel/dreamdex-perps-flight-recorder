@@ -763,19 +763,19 @@ async function cancelOrder(): Promise<void> {
     appendDetail("Order absent after cancellation", absent ? "YES" : "NOT CONFIRMED");
     appendDetail("Full lifecycle verified", state.evidence?.verification.verified ? "YES" : "NOT FULLY VERIFIED");
 
-    button.hidden = true;
+    button.hidden = absent;
     button.disabled = false;
-    button.textContent = "Cancel this order";
+    button.textContent = absent ? "Cancel this order" : "Check / retry cancellation";
     setEvidenceVisibility();
-    setTrace("#trace-order", "PLACED + CANCELLED", "pass");
-    setTrace("#trace-proof", state.evidence?.verification.verified ? "VERIFIED" : "NOT FULLY VERIFIED", state.evidence?.verification.verified ? "pass" : "fail");
+    setTrace("#trace-order", "CANCEL TX CONFIRMED", "pass");
+    setTrace("#trace-proof", state.evidence?.verification.verified ? "VERIFIED" : "READ-BACK PENDING", state.evidence?.verification.verified ? "pass" : "fail");
     setLiveStatus(
       state.evidence?.verification.verified
         ? "Verified: the order appeared, the cancellation transaction succeeded, and the order disappeared from the open-order list. Download the receipt for your submission."
-        : "Cancellation transaction succeeded, but the read-back did not fully verify the final state. Inspect the live testnet account before repeating.",
+        : "Cancellation transaction succeeded, but the read-back did not confirm that the order disappeared. Keep this order selected, inspect open orders in dreamDEX, and check again before placing another order.",
       state.evidence?.verification.verified ? "success" : "error",
     );
-    state.activeOrder = undefined;
+    if (absent) state.activeOrder = undefined;
     refreshPlaceButton();
   } catch (error) {
     setLiveStatus(error instanceof Error ? error.message : String(error), "error");
