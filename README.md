@@ -13,7 +13,7 @@ It is designed to do four things clearly:
 
 - **MVP target:** Somnia Hideki/Tokyo **testnet**, chain ID `50383`.
 - **No mainnet trading is required to submit the MVP on November 1, 2026.**
-- Testnet orders use fake/paper USDso collateral. The current Perps Arena gives a test wallet 1,000 paper USDso each week and 20 STT for gas. The developer docs report approximately 0.0003–0.003 STT for a transaction to a perp pool. The app and testnet rules can change; see the official links below.
+- Testnet orders use fake/paper USDso collateral. The bounty brief says Perps Arena distributes paper USDso weekly; the current developer guide documents a 1,000 paper USDso voucher and its claim-eligibility rules. For STT gas, the developer guide directs builders to Link a Bot with **Send it … for gas** enabled or use **Bots → Top up**; it does not promise a fixed weekly 20 STT grant. Observed perps-pool transactions cost around 0.0003–0.003 STT in the current docs. Rules can change; check the official links below.
 - The separate $200 post-award payment condition says an MVP winner must place orders on mainnet within 30 days after perps mainnet launches. Mainnet perps are not currently available, so this is a future condition, not a current build requirement.
 - The separate Perps Arena competition's reward eligibility rules may ask for SOMI on mainnet. Those are **not the same as the DoraHacks Builder Bounty rules**.
 
