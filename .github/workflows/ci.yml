@@ -56,5 +56,3 @@ jobs:
       - name: Read-only SDK preflight
         run: npm run preflight
 
-      - name: Inspect order-size result shape without signing
-        run: npx tsx src/diagnose-max-order-size.ts
