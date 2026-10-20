@@ -181,3 +181,7 @@ button:disabled { cursor: not-allowed; filter: grayscale(.25); }
   .tx-button-row { flex-direction: column; }
   .tx-button-row .button { width: 100%; }
 }
+
+.quote-button { width: 100%; margin-top: 12px; min-height: 38px; border-color: #bdb8aa; }
+.quote-status { margin: 8px 0 2px; color: var(--muted); font: 10px/1.7 var(--mono); overflow-wrap: anywhere; }
+#quote-status[data-tone="error"] { color: var(--red); }
