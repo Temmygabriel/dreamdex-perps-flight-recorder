@@ -11,7 +11,7 @@ It is built for the dreamDEX Perps Builder Bounty on Somnia Tokyo/Hideki testnet
 1. **Reads live markets.** Shows markets and the correct price tick, size step, minimum size and decimal precision returned by dreamDEX's SDK.
 2. **Checks an intended order.** Checks the price and quantity against market rules, then calls the SDK's live order-size preflight for the chosen account.
 3. **Explains a block.** Makes an invalid price/size, stale mark or account-size limit visible before the user attempts a trade.
-4. **Records evidence.** The manually run testnet smoke workflow can place one small post-only limit order, attempt to verify it in the open-order list, cancel it, and save the transaction hashes and read-back result as a JSON artifact.
+4. **Records evidence.** The web app connects to a browser wallet, asks for a separate confirmation before sending a post-only testnet order, reads back the order state, lets the user cancel it, and downloads the transaction hashes and read-back result as a JSON receipt.
 
 A preflight pass does **not** guarantee a transaction will later succeed. Market prices, order-book depth and account state can change.
 
@@ -21,8 +21,10 @@ A preflight pass does **not** guarantee a transaction will later succeed. Market
 - [x] TypeScript check and deterministic tick/lot/minimum-size tests pass in GitHub Actions.
 - [x] Read-only SDK connection reached Hideki testnet and returned 21 live perps markets (20 October 2026).
 - [x] Read-only order-size response checked on-chain using a dummy account; no private key was used.
-- [x] Dedicated manual testnet workflow added. It is locked to chain ID 50383, has a hard 25 paper-USDso notional cap, uses post-only orders, tries to cancel the order, and stores a receipt.
-- [ ] Complete a real testnet order/cancel/read-back run with a dedicated bot key.
+- [x] Wallet-connected trading flow added: browser wallet signing only, latest preflight before sending, post-only order, cancellation and read-back receipt.
+- [x] Production Vite build passes in GitHub Actions.
+- [x] Read-only market-minimum audit confirms BTC, ETH, XRP and SOL minimum orders fit within a 20 paper-USDso test budget at the time of the check.
+- [ ] Complete a real testnet order/cancel/read-back run using the user's connected wallet.
 - [ ] Deploy and check the public Vercel app.
 - [ ] Publish 2–3 X posts tagging `@DreamDEXSomnia`, then add their links here before bounty submission.
 
@@ -40,14 +42,15 @@ The separate Perps Arena trading competition has a 10-SOMI mainnet holding rule 
 
 More details: [docs/NETWORK_AND_FUNDS.md](docs/NETWORK_AND_FUNDS.md).
 
-## Run the local checks
+## Run the checks
 
-Requires Node.js 20 or later.
+Requires Node.js 22 or later (or Node.js 20.19+).
 
 ```bash
 npm install
 npm run typecheck
 npm test
+npm run build
 npm run preflight
 ```
 
@@ -57,9 +60,9 @@ npm run preflight
 
 The `CI` workflow runs TypeScript checks and the deterministic tests on pushes and pull requests. Its read-only testnet job does not need wallet secrets.
 
-The separate `Live testnet smoke` workflow is manual and asks you to explicitly select `YES` before it can send anything. It is intended to test one small post-only order and then cancel it. **Do not approve the live step until the secrets point to a dedicated testnet bot key and the correct public owner address.**
+The `Live testnet smoke` workflow is an optional developer fallback. The main MVP flow uses the browser wallet directly and does not need a private-key secret. If using the fallback, it asks you to select `YES` before it can send anything.
 
-Required repository **Actions secrets** (not Variables):
+Only for the optional GitHub Actions fallback, the repository needs these **Actions secrets** (not Variables):
 
 - `TESTNET_BOT_PRIVATE_KEY`: private key of a *new, dedicated testnet bot wallet* that has been linked for Perps on the dreamDEX testnet app.
 - `TESTNET_OWNER_ADDRESS`: public address of the DreamDEX testnet account the bot is authorised to trade for.
@@ -76,15 +79,16 @@ The bot private key must not be the key for your regular wallet. Never store it 
 
 ## Deploy the web app on Vercel
 
-No private key is needed in Vercel. The website and its `/api/markets` and `/api/preflight` endpoints are read-only.
+No private key is needed in Vercel. The browser uses your connected wallet to sign transactions, and the serverless endpoints only read markets, preflight rules and open orders.
 
 1. Open [Vercel's New Project page](https://vercel.com/new/import) and import `Temmygabriel/dreamdex-perps-flight-recorder`.
-2. Use the repository root as the project root and **Other** as the framework preset. Keep the functions in the root `api/` directory and the static website in `public/`.
-3. Use the repository's `vercel.json`. There is no build command required for the current static HTML/CSS/JavaScript version; set the static output directory to `public` only if the Vercel import screen asks you to choose one.
-4. Deploy, then test the site home page and `/api/markets`. It should report chain `50383` and the live market count. Test the order checker using only a **public wallet address**.
-5. Each commit to `main` should trigger a new deployment after the GitHub integration is connected.
+2. Select **Vite** as the framework preset and use the repository root as the project root.
+3. Keep the repository's `vercel.json`. It runs `npm run build`, publishes `dist`, and leaves the `api/` functions available.
+4. Deploy, then open the site and test `/api/markets`. It should report chain `50383` and the live market count. Test `/api/preflight` with a public wallet address. The order page will ask your browser wallet to switch to chain `50383`.
+5. Connect Rabby or another EVM wallet on the site, run preflight, and only then press **Place post-only testnet order**. Review the price and size, approve in the wallet pop-up, then cancel the resting order and download the JSON evidence receipt.
+6. Each commit to `main` should trigger a new deployment after GitHub integration is connected.
 
-**Do not add wallet private keys to Vercel.** The browser does not need to sign a transaction.
+**Do not add wallet private keys to Vercel or paste them into chat.** The browser does not need a private-key secret.
 
 ## Bounty feedback track
 
