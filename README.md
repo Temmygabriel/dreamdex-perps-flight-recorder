@@ -28,7 +28,7 @@ A preflight pass does **not** guarantee a transaction will later succeed. Market
 - [ ] Deploy and check the public Vercel app.
 - [ ] Publish 2–3 X posts tagging `@DreamDEXSomnia`, then add their links here before bounty submission.
 
-No live order has yet been verified by this repository's evidence receipt. Do not describe that step as finished until its GitHub Actions run produces a verified receipt.
+No real order has yet been sent by this repository's browser flow. The live-trade stage is still unverified until you connect your testnet wallet, place and cancel an order, and download a receipt whose read-back checks pass.
 
 ## Network and cost
 
@@ -84,7 +84,7 @@ No private key is needed in Vercel. The browser uses your connected wallet to si
 1. Open [Vercel's New Project page](https://vercel.com/new/import) and import `Temmygabriel/dreamdex-perps-flight-recorder`.
 2. Select **Vite** as the framework preset and use the repository root as the project root.
 3. Keep the repository's `vercel.json`. It runs `npm run build`, publishes `dist`, and leaves the `api/` functions available.
-4. Deploy, then open the site and test `/api/markets`. It should report chain `50383` and the live market count. Test `/api/preflight` with a public wallet address. The order page will ask your browser wallet to switch to chain `50383`.
+4. Deploy, then open the site and test `/api/markets`. It should report chain `50383` and the live market count. `/api/quote?symbol=BTC-USDso` should return live bid/ask and a minimum size if that symbol is current. The order page will ask your browser wallet to switch to chain `50383`.
 5. Connect Rabby or another EVM wallet on the site, run preflight, and only then press **Place post-only testnet order**. Review the price and size, approve in the wallet pop-up, then cancel the resting order and download the JSON evidence receipt.
 6. Each commit to `main` should trigger a new deployment after GitHub integration is connected.
 
