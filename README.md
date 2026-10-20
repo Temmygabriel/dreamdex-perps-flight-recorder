@@ -44,7 +44,7 @@ This repository was empty at project start. The first implementation phase is SD
 Node.js 20 or later.
 
 ```bash
-npm ci
+npm install
 npm test
 npm run typecheck
 npm run preflight
