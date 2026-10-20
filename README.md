@@ -17,6 +17,21 @@ It is built for the dreamDEX Perps Builder Bounty on Somnia Tokyo/Hideki testnet
 
 A preflight pass does **not** guarantee a transaction will later succeed. Market prices, order-book depth and account state can change.
 
+## Funding a testnet wallet
+
+If preflight reports `walletBalance`, the order geometry can still be valid while the checked address has no spendable Perps margin.
+
+1. Open the official [dreamDEX Perps Arena](https://app.testnet.dreamdex.io/competition) and sign in with the account you intend to use. The current Arena page describes a weekly allocation of 1,000 paper USDso and 20 STT per trading wallet.
+2. In the official testnet app, check which **trading-wallet address** received the paper credit. It may not be the same as an external wallet used only to sign in.
+3. If the paper USDso is in Spot, use **Perps ⇆ Spot** on the Perps page to move it into the Perps account. Orders use Perps margin.
+4. STT is testnet gas; USDso is trading margin. They are different balances.
+
+OrderProof currently signs direct `placeOrder` and `cancelOrder` calls from the connected browser-wallet address. That address must be the account that actually owns the margin being checked. Never assume a sign-in wallet and a separate dreamDEX trading wallet are interchangeable.
+
+## Wallet security alerts
+
+OrderProof is an independent community project, not the official dreamDEX website. If MetaMask displays a phishing or wallet-draining warning for this site, do **not** bypass the alert or sign a transaction to get past it. Verify the URL and request a review through [MetaMask's security-alert guidance](https://support.metamask.io/configure/wallet/security-alerts). A code change cannot clear MetaMask's website-reputation classification.
+
 ## Current status
 
 - [x] Public repository and first UI/API implementation committed.
