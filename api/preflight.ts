@@ -111,14 +111,37 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       autoPull: false,
     });
 
-    const placeable = Boolean(max.priceable && max.placeable && quantity <= BigInt(max.maxQuantity));
-    const failure = !max.priceable
-      ? "The live mark is stale or unavailable, so the SDK cannot safely size this order."
-      : !max.placeable
-        ? `The protocol says this account cannot open/increase this position right now: ${String(max.limitedBy)}.`
-        : quantity > BigInt(max.maxQuantity)
-          ? "The requested quantity is larger than the protocol's current maximum for this account."
-          : undefined;
+    // PerpMaxOrderSize is a discriminated union. When priceable is false the
+    // SDK deliberately omits placeable/maxQuantity/limitedBy, so return before
+    // trying to read those fields.
+    if (!max.priceable) {
+      res.status(200).json({
+        ok: true,
+        pass: false,
+        stage: "live-sdk-preflight",
+        result: "BLOCKED",
+        explanation: "The live mark is stale or unavailable, so the SDK cannot safely size this order.",
+        failures: [{ code: "STALE_OR_MISSING_MARK", message: "No live price is available for sizing." }],
+        market: {
+          symbol,
+          poolAddress: market.poolAddress,
+          baseDecimals,
+          quoteDecimals,
+          tickSize: formatUnits(BigInt(market.tickSize), quoteDecimals),
+          lotSize: formatUnits(BigInt(market.lotSize), baseDecimals),
+          minQuantity: formatUnits(BigInt(market.minQuantity), baseDecimals),
+        },
+        transactionSent: false,
+      });
+      return;
+    }
+
+    const placeable = max.placeable && quantity <= max.maxQuantity;
+    const failure = !max.placeable
+      ? `The protocol says this account cannot open/increase this position right now: ${String(max.limitedBy)}.`
+      : quantity > max.maxQuantity
+        ? "The requested quantity is larger than the protocol's current maximum for this account."
+        : undefined;
 
     res.status(200).json({
       ok: true,
