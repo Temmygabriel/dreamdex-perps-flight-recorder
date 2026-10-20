@@ -102,13 +102,17 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       return;
     }
 
+    // Match the actual browser write path below: it calls the pool's
+    // placeOrder directly and does not invoke the SDK's auto-pull helper.
+    // Preflighting with autoPull=true could size a different funding path
+    // from the one the user will actually submit.
     const max = await exchange.client.getMaxPerpOrderSize({
       pool: market.poolAddress,
       marginBank: market.marginBank,
       account: account as `0x${string}`,
       isBid: side === "long",
       price,
-      autoPull: true,
+      autoPull: false,
     });
 
     // PerpMaxOrderSize is a discriminated union. When priceable is false the
