@@ -151,3 +151,33 @@ footer a:hover { color: var(--copper-dark); }
   .bottom-note { grid-template-columns: 1fr; gap: 19px; }
   footer { flex-direction: column; padding: 15px 14px 22px; }
 }
+
+
+/* Wallet-first testnet execution */
+.header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.wallet-status { max-width: 165px; color: #c8c5bb; font: 9px var(--mono); text-align: right; overflow-wrap: anywhere; }
+.wallet-connected { color: #a6d3b5; }
+.wallet-is-connected { background: #315b47; }
+#global-status[data-tone="success"] { color: var(--green); }
+#global-status[data-tone="error"] { color: var(--red); }
+#live-order-status[data-tone="success"] { color: var(--green); }
+#live-order-status[data-tone="error"] { color: var(--red); }
+.live-order-box { margin-top: 18px; padding: 18px; background: #f0eee5; border: 1px solid var(--line); border-top: 2px solid var(--copper); }
+.live-order-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.live-order-heading .eyebrow { margin-bottom: 6px; }
+.live-order-heading h3 { margin: 0; font: 500 22px/1.12 var(--serif); }
+.live-order-warning { margin: 13px 0; padding: 10px 12px; border-left: 2px solid var(--copper); background: #e6e1d3; color: #55564f; font-size: 11px; }
+.tx-button-row { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 12px; }
+.tx-button-row .button { flex: 1 1 180px; margin: 0; }
+.tx-button-row .button[hidden] { display: none; }
+.live-order-status { margin-top: 14px; padding: 10px 11px; background: #fbfaf6; border: 1px solid #d4d0c4; color: var(--muted); font: 10px/1.7 var(--mono); overflow-wrap: anywhere; }
+#live-order-details { margin-top: 12px; }
+#live-order-details:empty { display: none; }
+button:disabled { cursor: not-allowed; filter: grayscale(.25); }
+@media (max-width: 700px) {
+  .header-actions { gap: 7px; }
+  .wallet-status { width: 100%; max-width: 100%; }
+  .live-order-heading { flex-direction: column; }
+  .tx-button-row { flex-direction: column; }
+  .tx-button-row .button { width: 100%; }
+}
