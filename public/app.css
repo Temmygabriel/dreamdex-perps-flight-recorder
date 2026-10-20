@@ -276,3 +276,6 @@ footer { border-color: #dce3ed; color: #738198; }
   .hero { padding-top: 34px; }
   .order-panel,.evidence-panel { padding: 17px 14px; }
 }
+
+#download-preflight-diagnostic[hidden] { display: none; }
+.preflight-evidence-button { margin-top: 12px; width: 100%; }
