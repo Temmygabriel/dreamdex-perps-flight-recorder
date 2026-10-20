@@ -3,6 +3,7 @@ import {
   SomniaMarkets,
 } from "@somnia-chain/markets-sdk";
 import { hidekiTestnet } from "@somnia-chain/markets-sdk/chains";
+import { formatUnits } from "viem";
 
 type Req = { method?: string };
 type Res = {
@@ -43,9 +44,9 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       tickSizeRaw: String(row.tickSize),
       lotSizeRaw: String(row.lotSize),
       minQuantityRaw: String(row.minQuantity),
-      tickSize: String(row.tickSize),
-      lotSize: String(row.lotSize),
-      minQuantity: String(row.minQuantity),
+      tickSize: formatUnits(BigInt(row.tickSize), Number(row.quoteDecimals)),
+      lotSize: formatUnits(BigInt(row.lotSize), Number(row.baseDecimals)),
+      minQuantity: formatUnits(BigInt(row.minQuantity), Number(row.baseDecimals)),
     }));
 
     res.status(200).json({
