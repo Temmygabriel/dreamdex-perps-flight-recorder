@@ -1,58 +1,110 @@
 # Perps Flight Recorder
 
-Perps Flight Recorder is a testnet-first trader tool for dreamDEX perpetual futures on Somnia Hideki/Tokyo testnet (chain ID 50383).
+**A testnet-first order checker and evidence recorder for dreamDEX perpetual futures.**
 
-It is designed to do four things clearly:
+Perps Flight Recorder helps a trader or builder see whether a proposed order follows the live market's rules, then preserves proof of what happened during a real testnet order attempt.
 
-1. Read current perps markets and their trading rules from the official SDK.
-2. Check an order's market, price tick, quantity step, minimum size, live priceability, and account size limits before any transaction is sent.
-3. Require a separate, explicit action before submitting an order.
-4. Save a truthful execution receipt containing the request, result, transaction hash (when returned), and a read-back verification status.
+It is built for the dreamDEX Perps Builder Bounty on Somnia Tokyo/Hideki testnet (chain ID `50383`).
 
-## Network and money
+## What it does
 
-- **MVP target:** Somnia Hideki/Tokyo **testnet**, chain ID `50383`.
-- **No mainnet trading is required to submit the MVP on November 1, 2026.**
-- Testnet orders use fake/paper USDso collateral. The bounty brief says Perps Arena distributes paper USDso weekly; the current developer guide documents a 1,000 paper USDso voucher and its claim-eligibility rules. For STT gas, the developer guide directs builders to Link a Bot with **Send it … for gas** enabled or use **Bots → Top up**; it does not promise a fixed weekly 20 STT grant. Observed perps-pool transactions cost around 0.0003–0.003 STT in the current docs. Rules can change; check the official links below.
-- The separate $200 post-award payment condition says an MVP winner must place orders on mainnet within 30 days after perps mainnet launches. Mainnet perps are not currently available, so this is a future condition, not a current build requirement.
-- The separate Perps Arena competition's reward eligibility rules may ask for SOMI on mainnet. Those are **not the same as the DoraHacks Builder Bounty rules**.
+1. **Reads live markets.** Shows markets and the correct price tick, size step, minimum size and decimal precision returned by dreamDEX's SDK.
+2. **Checks an intended order.** Checks the price and quantity against market rules, then calls the SDK's live order-size preflight for the chosen account.
+3. **Explains a block.** Makes an invalid price/size, stale mark or account-size limit visible before the user attempts a trade.
+4. **Records evidence.** The manually run testnet smoke workflow can place one small post-only limit order, attempt to verify it in the open-order list, cancel it, and save the transaction hashes and read-back result as a JSON artifact.
 
-## Important safety rules
-
-- Never put a main wallet's private key in this repository, Vercel, or GitHub Actions.
-- Use a new, dedicated **testnet-only bot key**. Do not use the private key for your everyday wallet.
-- GitHub Actions tests should be read-only by default. No test should broadcast an order unless a separate manual workflow is explicitly enabled.
-- Never print private keys or full environment values in logs.
-- A paper USDso voucher is not withdrawable real money.
-- Do not claim an API/SDK issue in the bounty submission unless its behavior has been reproduced and the evidence is saved.
+A preflight pass does **not** guarantee a transaction will later succeed. Market prices, order-book depth and account state can change.
 
 ## Current status
 
-This repository was empty at project start. The first implementation phase is SDK/network diagnostics and deterministic unit tests. Live-order capability is gated until SDK compatibility, account setup, and transaction verification have passed.
+- [x] Public repository and first UI/API implementation committed.
+- [x] TypeScript check and deterministic tick/lot/minimum-size tests pass in GitHub Actions.
+- [x] Read-only SDK connection reached Hideki testnet and returned 21 live perps markets (20 October 2026).
+- [x] Read-only order-size response checked on-chain using a dummy account; no private key was used.
+- [x] Dedicated manual testnet workflow added. It is locked to chain ID 50383, has a hard 25 paper-USDso notional cap, uses post-only orders, tries to cancel the order, and stores a receipt.
+- [ ] Complete a real testnet order/cancel/read-back run with a dedicated bot key.
+- [ ] Deploy and check the public Vercel app.
+- [ ] Publish 2–3 X posts tagging `@DreamDEXSomnia`, then add their links here before bounty submission.
 
-## Official resources
+No live order has yet been verified by this repository's evidence receipt. Do not describe that step as finished until its GitHub Actions run produces a verified receipt.
 
-- [Perps developer guide](https://app.testnet.dreamdex.io/docs/developers/perps-testnet)
-- [Perps trading guide](https://app.testnet.dreamdex.io/docs/trading/perps-testnet)
-- [Order types](https://app.testnet.dreamdex.io/docs/trading/perps-testnet/orders)
-- [Link a Bot](https://app.testnet.dreamdex.io/docs/trading/common/link-a-bot)
-- [Perps Arena](https://app.testnet.dreamdex.io/competition)
-- [Bounty page](https://dorahacks.io/hackathon/dreamdex-perps-bounty/detail)
+## Network and cost
 
-## Development
+- **Required for the MVP submission now:** Somnia Tokyo/Hideki testnet, chain ID `50383`.
+- **Not required now:** mainnet funds. Mainnet perps are not currently available in the developer docs, and the MVP bounty asks for orders on testnet.
+- **Free testnet allocation:** the official Perps Arena page currently describes 1,000 paper USDso and 20 STT per week for an eligible test wallet.
+- **Testnet gas:** the developer docs report observed perps-pool transaction fees of roughly 0.0003–0.003 STT each. Actual fees may vary.
+- **Later $200 payment condition:** if this MVP wins, the remaining $200 depends on placing orders on mainnet within 30 days after dreamDEX launches perps there. The mainnet conditions and required budget cannot be calculated reliably until that launch happens.
 
-Node.js 20 or later.
+The separate Perps Arena trading competition has a 10-SOMI mainnet holding rule for its own reward eligibility. That is not stated as a requirement for submitting this Builder Bounty MVP. Do not purchase SOMI just to start the testnet build.
+
+More details: [docs/NETWORK_AND_FUNDS.md](docs/NETWORK_AND_FUNDS.md).
+
+## Run the local checks
+
+Requires Node.js 20 or later.
 
 ```bash
 npm install
-npm test
 npm run typecheck
+npm test
 npm run preflight
 ```
 
-The preflight is read-only and does not need a private key. Network diagnostics may need public RPC/WebSocket access.
+`npm run preflight` is read-only. It connects to testnet market data without a private key and sends no transaction.
 
-## Bounty tracks
+## GitHub Actions
 
-- **Feedback:** one Markdown file under `feedback/` per independently reproduced issue, with severity, steps, expected/actual results, evidence, and environment. Do not put security vulnerabilities in the public repository; report those privately to security@dreamdex.io.
-- **MVP:** a usable perps product that places real transactions on the **testnet**, with transaction hashes and a reproducible demo. The README must later include links to 2–3 X posts mentioning `@DreamDEXSomnia`.
+The `CI` workflow runs TypeScript checks and the deterministic tests on pushes and pull requests. Its read-only testnet job does not need wallet secrets.
+
+The separate `Live testnet smoke` workflow is manual and asks you to explicitly select `YES` before it can send anything. It is intended to test one small post-only order and then cancel it. **Do not approve the live step until the secrets point to a dedicated testnet bot key and the correct public owner address.**
+
+Required repository **Actions secrets** (not Variables):
+
+- `TESTNET_BOT_PRIVATE_KEY`: private key of a *new, dedicated testnet bot wallet* that has been linked for Perps on the dreamDEX testnet app.
+- `TESTNET_OWNER_ADDRESS`: public address of the DreamDEX testnet account the bot is authorised to trade for.
+
+The bot private key must not be the key for your regular wallet. Never store it in the repository, Vercel environment variables, source code, an issue, or a chat. The bot key should be linked using the app's **Link a bot** flow; it can place/cancel/reduce orders for the owner but cannot withdraw from the owner's account.
+
+### Run the manual smoke test
+
+1. Open the Actions tab of this repository and select **Live testnet smoke**.
+2. Choose the market and side, keep the notional at `20` paper USDso or less, and leave confirmation as `NO` until the owner/key setup has been verified.
+3. Only after checking the correct testnet bot key and account, select `YES` and run the workflow.
+4. Open the run's **Artifacts** section and download `perps-flight-recorder-live-testnet-receipt`.
+5. The result is only verified if its receipt says the resting order was visible after placement and absent after cancellation. If a cancellation fails, inspect the testnet account's open orders before trying again.
+
+## Deploy the web app on Vercel
+
+No private key is needed in Vercel. The website and its `/api/markets` and `/api/preflight` endpoints are read-only.
+
+1. Open [Vercel's New Project page](https://vercel.com/new/import) and import `Temmygabriel/dreamdex-perps-flight-recorder`.
+2. Use the repository root as the project root and **Other** as the framework preset. Keep the functions in the root `api/` directory and the static website in `public/`.
+3. Use the repository's `vercel.json`. There is no build command required for the current static HTML/CSS/JavaScript version; set the static output directory to `public` only if the Vercel import screen asks you to choose one.
+4. Deploy, then test the site home page and `/api/markets`. It should report chain `50383` and the live market count. Test the order checker using only a **public wallet address**.
+5. Each commit to `main` should trigger a new deployment after the GitHub integration is connected.
+
+**Do not add wallet private keys to Vercel.** The browser does not need to sign a transaction.
+
+## Bounty feedback track
+
+Each accepted feedback issue must be reproducible, relevant and not already reported by another builder. Put each issue in its own Markdown file under `feedback/`, using the template described in [feedback/README.md](feedback/README.md). Do not publish security vulnerabilities here; report those privately to `security@dreamdex.io`.
+
+The initial SDK/type-checking failure encountered while developing this repository was caused by our code not narrowing the SDK's documented discriminated result correctly. A read-only runtime check confirmed the SDK returned `priceable`, `placeable`, `maxQuantity`, and `limitedBy` as expected. **We are not treating that as a dreamDEX bug.**
+
+## Official links
+
+- [Perps developer guide](https://app.testnet.dreamdex.io/docs/developers/perps-testnet)
+- [Perps trading guide](https://app.testnet.dreamdex.io/docs/trading/perps-testnet)
+- [Link a Bot](https://app.testnet.dreamdex.io/docs/trading/common/link-a-bot)
+- [Perps Arena](https://app.testnet.dreamdex.io/competition)
+- [dreamDEX bot kit](https://github.com/somnia-chain/dreamdex-bot-kit)
+- [Builder Bounty page](https://dorahacks.io/hackathon/dreamdex-perps-bounty/detail)
+
+## X posts for the bounty submission
+
+Add 2–3 real post links that describe the product, show the build or evidence, and tag `@DreamDEXSomnia`. Do not submit until the links are added here.
+
+- Post 1: pending
+- Post 2: pending
+- Post 3: pending
