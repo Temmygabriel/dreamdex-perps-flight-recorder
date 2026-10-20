@@ -13,13 +13,11 @@ Official developer docs:
 
 ## The free testnet allocation
 
-The official Perps Arena page says each testnet trading wallet receives weekly:
-- 1,000 paper USDso for perps margin
-- 20 STT for testnet gas
+The bounty description says Perps Arena paper USDso is distributed weekly. The current perps developer guide describes the 1,000 paper USDso voucher and says an address is eligible to claim it once while it has no open perps positions or orders. Follow the amount and status shown in the app for your account; this is fake trading collateral, not real money.
 
-The developer page says observed perps-pool transactions cost approximately 0.0003–0.003 STT each. That is a measured range in the docs, not a promise that every transaction always costs the same. One pending take-profit or stop-loss can temporarily hold 0.15 STT; this MVP should avoid adding stop orders until they are needed.
+For gas, the current Hideki developer guide tells builders to sign in to dreamDEX, link the bot key, and leave **Send it … for gas** enabled, or use **Bots → Top up** to send STT. The current Hideki perps developer guide does not promise a fixed 20 STT weekly gas grant, so do not budget around that number. It reports roughly 0.0003–0.003 STT used by each transaction to a perp pool, though actual usage can vary. One pending take-profit or stop-loss holds 0.15 STT temporarily; our smoke test avoids placing stop orders.
 
-**Budget for current testnet development: $0 expected.** Start with the free allocation. Do not buy testnet tokens.
+**Budget for current testnet development: $0 expected.** Try the app's testnet gas route first. Do not buy testnet tokens.
 
 ## Do not confuse Perps Arena rewards with the Builder Bounty
 
