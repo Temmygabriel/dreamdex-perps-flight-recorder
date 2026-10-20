@@ -837,6 +837,26 @@ async function handleReceipt(event: Event): Promise<void> {
   }
 }
 
+
+function invalidatePreflightOnEdit(): void {
+  // A passed check describes only the exact inputs that were checked. If any
+  // field changes, make the user run the live check again before a transaction.
+  const stateLabel = $("#preflight-state");
+  if (stateLabel.textContent === "PREFLIGHT PASSED" || stateLabel.textContent === "BLOCKED") {
+    stateLabel.textContent = "CHECK AGAIN";
+    stateLabel.className = "result-state";
+    $("#preflight-message").textContent = "Your inputs changed. Run live preflight again before placing an order.";
+    $("#live-order-box").hidden = true;
+    setTrace("#trace-preflight", "RECHECK REQUIRED", "pending");
+  }
+  refreshPlaceButton();
+}
+
+for (const selector of ["#account-address", "#market-select", "#side-select", "#price-input", "#quantity-input"]) {
+  $(selector).addEventListener("input", invalidatePreflightOnEdit);
+  $(selector).addEventListener("change", invalidatePreflightOnEdit);
+}
+
 $("#connect-wallet").addEventListener("click", () => {
   connectWallet().catch((error) => setStatus(error instanceof Error ? error.message : String(error), "error"));
 });
