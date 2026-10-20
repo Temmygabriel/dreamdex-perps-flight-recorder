@@ -127,6 +127,7 @@ const $ = <T extends HTMLElement>(selector: string): T => {
 };
 
 const state: State = { markets: [] };
+let latestPreflightDiagnostic: Record<string, unknown> | undefined;
 const RPC_URL = "https://api.hideki2.infra.testnet.somnia.network";
 const WS_RPC_URL = "wss://api.hideki2.infra.testnet.somnia.network/ws";
 const INDEXER_URL = "https://hideki-dev.smk.somnia.host/v1/graphql";
@@ -389,6 +390,36 @@ async function requestPreflight(): Promise<any> {
   return result;
 }
 
+function capturePreflightDiagnostic(result: unknown): void {
+  latestPreflightDiagnostic = {
+    schemaVersion: 1,
+    kind: "orderproof-preflight-diagnostic",
+    product: "OrderProof",
+    recordedAt: new Date().toISOString(),
+    network: { name: "Somnia Hideki / dreamDEX Tokyo testnet", chainId: CHAIN_ID },
+    sdkVersion: "0.32.1",
+    appVersion: "0.1.0",
+    request: formPayload(),
+    response: result,
+    transactionSent: false,
+    privacyNotice: "This diagnostic contains the public account address and market/order details. Review it before sharing. It must not contain wallet private keys or recovery phrases.",
+  };
+  const button = $("#download-preflight-diagnostic") as HTMLButtonElement;
+  button.hidden = false;
+}
+
+function savePreflightDiagnostic(): void {
+  if (!latestPreflightDiagnostic) return;
+  const contents = JSON.stringify(latestPreflightDiagnostic, null, 2) + "\n";
+  const blob = new Blob([contents], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "orderproof-preflight-diagnostic.json";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function renderPreflight(result: any): void {
   const box = $("#preflight-result");
   box.hidden = false;
@@ -469,14 +500,18 @@ async function handlePreflight(event: SubmitEvent): Promise<void> {
   setTrace("#trace-proof", "NOT VERIFIED", "pending");
   try {
     const result = await requestPreflight();
+    capturePreflightDiagnostic(result);
     renderPreflight(result);
   } catch (error) {
-    renderPreflight({
+    const result = {
       pass: false,
       stage: "request",
       error: error instanceof Error ? error.message : String(error),
       explanation: "The check could not finish. No order was sent.",
-    });
+      transactionSent: false,
+    };
+    capturePreflightDiagnostic(result);
+    renderPreflight(result);
   } finally {
     button.disabled = false;
     button.textContent = "Run live preflight →";
@@ -836,18 +871,20 @@ async function cancelOrder(): Promise<void> {
 function renderReceipt(record: any): void {
   const element = $("#receipt-result");
   element.hidden = false;
-  const verified = record?.verification?.verified === true;
-  element.className = `receipt-result ${verified ? "verified" : "unverified"}`;
+  const claimedVerified = record?.verification?.verified === true;
+  // Imported JSON is user-provided input. Never trust its "verified" flag as
+  // proof: this view has not queried chain receipts or independently read state.
+  element.className = "receipt-result";
   element.replaceChildren();
 
   const title = document.createElement("strong");
-  title.textContent = verified ? "VERIFIED LIFECYCLE" : "NOT FULLY VERIFIED";
+  title.textContent = claimedVerified ? "RECEIPT CLAIM: VERIFIED LIFECYCLE" : "RECEIPT CLAIM: INCOMPLETE";
   element.appendChild(title);
 
   const summary = document.createElement("p");
-  summary.textContent = verified
-    ? "This saved receipt says the order appeared in the open-order list, then disappeared after cancellation."
-    : "This file does not prove the complete order lifecycle. Check the transaction hashes, any error, and the actual testnet account.";
+  summary.textContent = claimedVerified
+    ? "The JSON file claims the order appeared and disappeared after cancellation. This import view has NOT independently checked either transaction hash or queried the blockchain; do not treat the imported file alone as independent verification."
+    : "The JSON does not claim a fully verified lifecycle. This import view only inspects file contents; it does not independently verify transaction hashes or query the blockchain.";
   element.appendChild(summary);
 
   const fields: Array<[string, string]> = [];
@@ -888,6 +925,9 @@ async function handleReceipt(event: Event): Promise<void> {
 
 
 function invalidatePreflightOnEdit(): void {
+  latestPreflightDiagnostic = undefined;
+  const diagnosticButton = $("#download-preflight-diagnostic") as HTMLButtonElement;
+  diagnosticButton.hidden = true;
   // A passed check describes only the exact inputs that were checked. If any
   // field changes, make the user run the live check again before a transaction.
   const stateLabel = $("#preflight-state");
@@ -936,6 +976,7 @@ $("#cancel-order").addEventListener("click", () => {
   cancelOrder().catch((error) => setLiveStatus(error instanceof Error ? error.message : String(error), "error"));
 });
 $("#download-receipt").addEventListener("click", saveEvidence);
+$("#download-preflight-diagnostic").addEventListener("click", savePreflightDiagnostic);
 $("#receipt-file").addEventListener("change", (event) => {
   handleReceipt(event).catch((error) => setStatus(error instanceof Error ? error.message : String(error), "error"));
 });
