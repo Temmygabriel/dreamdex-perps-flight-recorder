@@ -153,10 +153,22 @@ async function main(): Promise<void> {
       );
     }
 
+    // Use the SDK/CCXT market symbol, not the UI alias BTC-PERP. The official
+    // unified symbol is typically BTC/USDso:USDso; using the UI alias here can
+    // make the book request fail before a safe test is possible.
+    const unifiedMarkets = await exchange.loadMarkets();
+    const unifiedMarket = Object.values(unifiedMarkets).find((row: any) =>
+      row.type === "swap" &&
+      String(row.base ?? row.info?.baseSymbol ?? "").toUpperCase() === baseSymbol
+    ) as any;
+    if (!unifiedMarket?.symbol) {
+      throw new Error(`No active SDK swap symbol was found for ${baseSymbol}. No transaction was sent.`);
+    }
+
     // Use a limit price away from the opposing side, and POST_ONLY so this
     // smoke test should rest rather than opening a position. If the book moves
     // and the order would cross, the protocol must reject it instead of filling.
-    const book = await exchange.fetchOrderBook(`${baseSymbol}-PERP`, 5);
+    const book = await exchange.fetchOrderBook(unifiedMarket.symbol, 5);
     const top = side === "long" ? book.bids[0]?.[0] : book.asks[0]?.[0];
     if (top === undefined || !(Number(top) > 0)) {
       throw new Error(`The ${baseSymbol} book has no suitable top-of-book quote. No transaction was sent.`);
