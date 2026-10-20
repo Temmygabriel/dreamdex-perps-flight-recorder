@@ -145,7 +145,7 @@
           <div>
             <p class="eyebrow">LIVE TEST / MANUAL GATE</p>
             <strong>Place, cancel and verify one small order</strong>
-            <p>The workflow is limited to testnet, caps the intended order at 25 paper USDso and saves a JSON receipt. Nothing runs until you select YES.</p>
+            <p>The browser-wallet flow above is the main demo. The GitHub Actions path is an optional developer fallback, limited to testnet, capped at 25 paper USDso, and saves a JSON receipt.</p>
           </div>
           <a class="button button-dark" href="https://github.com/Temmygabriel/dreamdex-perps-flight-recorder/actions/workflows/live-testnet-smoke.yml" target="_blank" rel="noreferrer">Open test workflow ↗</a>
         </div>
@@ -164,7 +164,7 @@
     </div>
 
     <section class="bottom-note">
-      <div><p class="eyebrow">SAFETY RULE</p><p>This tool does not use mainnet, store wallet keys, or claim that a passed preflight guarantees execution. Live order creation is kept in a manual workflow using a dedicated testnet bot key.</p></div>
+      <div><p class="eyebrow">SAFETY RULE</p><p>This tool does not use mainnet or store wallet keys. Your browser wallet signs the transaction. A passed preflight is not a guarantee: live prices, margin and orders can change.</p></div>
       <div><p class="eyebrow">BOUNTY DEADLINE</p><p><strong>1 November 2026 · 23:59 UTC</strong><br>Testnet order evidence and the public repository are required for the MVP submission.</p></div>
     </section>
   </main>
