@@ -35,7 +35,8 @@ jobs:
 
   testnet-read-only:
     name: Optional read-only testnet check
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
