@@ -105,6 +105,7 @@
           <p id="preflight-message"></p>
           <dl id="preflight-details" class="detail-list"></dl>
           <p class="no-transaction-note"><span aria-hidden="true">●</span> No transaction was sent by this check.</p>
+          <button id="download-preflight-diagnostic" class="button button-dark preflight-evidence-button" type="button" hidden>Download diagnostic report</button>
         </div>
 
         <div id="live-order-box" class="live-order-box" hidden>
@@ -166,7 +167,7 @@
           <div>
             <p class="eyebrow">EXISTING EVIDENCE</p>
             <h3>Check a saved receipt</h3>
-            <p>Already have a JSON receipt? Select it to see whether it records a complete place-and-cancel check. The file is read locally in your browser.</p>
+            <p>Already have a JSON receipt? Inspect what the file claims. This import view does not independently verify transaction hashes against the blockchain.</p>
           </div>
           <label class="file-button" for="receipt-file">Choose receipt file</label>
           <input id="receipt-file" type="file" accept="application/json,.json" hidden>
