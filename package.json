@@ -13,7 +13,8 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test:e2e": "playwright test",
-    "check:perps-readiness": "tsx scripts/check-perps-readiness.ts"
+    "check:perps-readiness": "tsx scripts/check-perps-readiness.ts",
+    "testnet:order-smoke": "tsx scripts/run-testnet-order-smoke.ts"
   },
   "dependencies": {
     "@somnia-chain/markets-sdk": "0.32.1",
