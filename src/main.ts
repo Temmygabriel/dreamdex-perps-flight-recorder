@@ -68,6 +68,7 @@ type OrderEvidence = {
   network: { name: string; chainId: number };
   sdkVersion: string;
   account: string;
+  sessionPlan: { thesis: string; budgetPaperUsdso: number };
   order: {
     market: string;
     sdkSymbol: string;
@@ -120,6 +121,23 @@ type State = {
   evidence?: OrderEvidence;
 };
 
+type SessionJournalEntry = {
+  id: string;
+  recordedAt: string;
+  thesis: string;
+  budgetPaperUsdso: number;
+  market: string;
+  side: string;
+  price: string;
+  quantity: string;
+  notionalPaperUsdso: string;
+  placementHash: string;
+  cancellationHash?: string;
+  status: "pending" | "verified" | "incomplete";
+};
+
+const JOURNAL_KEY = "perps-practice-desk-journal-v1";
+
 const $ = <T extends HTMLElement>(selector: string): T => {
   const node = document.querySelector(selector);
   if (!node) throw new Error(`Required page element missing: ${selector}`);
@@ -160,6 +178,150 @@ function escapeHtml(value: unknown): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function sessionThesis(): string {
+  return ($("#session-thesis") as HTMLInputElement).value.trim();
+}
+
+function sessionBudget(): number {
+  const value = Number(($("#session-budget") as HTMLSelectElement).value || 10);
+  return [5, 10, 25].includes(value) ? value : 10;
+}
+
+function estimateNotional(market: Market, priceText: string, quantityText: string): number {
+  const price = parseUnits(priceText, market.quoteDecimals);
+  const quantity = parseUnits(quantityText, market.baseDecimals);
+  const raw = (price * quantity) / (10n ** BigInt(market.baseDecimals));
+  return Number(formatUnits(raw, market.quoteDecimals));
+}
+
+function enforceSessionBudget(result: any): any {
+  if (result?.pass !== true) return result;
+  const market = currentMarket();
+  if (!market) return {
+    ...result, pass: false, stage: "session-plan",
+    explanation: "No live market is selected. Refresh markets and run the check again.",
+  };
+  try {
+    const payload = formPayload();
+    const notional = estimateNotional(market, payload.price, payload.quantity);
+    const budget = sessionBudget();
+    if (notional > budget + 0.001) {
+      return {
+        ...result,
+        pass: false,
+        stage: "session-budget",
+        explanation: `The order is about ${notional.toFixed(4)} paper USDso, above your ${budget} USDso session budget. Reduce the size or choose a larger budget, then run preflight again.`,
+        failures: [...(result.failures ?? []), {
+          code: "SESSION_BUDGET_EXCEEDED",
+          message: `Estimated order value ${notional.toFixed(4)} exceeds the selected ${budget} USDso cap.`,
+        }],
+      };
+    }
+  } catch (error) {
+    return {
+      ...result, pass: false, stage: "session-plan",
+      explanation: error instanceof Error ? error.message : "Could not calculate order value for the session budget.",
+    };
+  }
+  return result;
+}
+
+function readJournal(): SessionJournalEntry[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(JOURNAL_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed as SessionJournalEntry[] : [];
+  } catch {
+    return [];
+  }
+}
+
+function renderJournal(): void {
+  const entries = readJournal();
+  const count = $("#journal-count");
+  const list = $("#journal-list");
+  if (!count || !list) return;
+  count.textContent = `${entries.length} SESSION${entries.length === 1 ? "" : "S"}`;
+  list.replaceChildren();
+  if (entries.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "journal-empty";
+    empty.textContent = "No sessions yet. Start with a thesis, check an order, then verify its lifecycle.";
+    list.appendChild(empty);
+    return;
+  }
+  for (const entry of entries.slice(0, 6)) {
+    const card = document.createElement("article");
+    card.className = "journal-entry";
+    const head = document.createElement("div");
+    head.className = "journal-entry-head";
+    const market = document.createElement("strong");
+    market.textContent = entry.market;
+    const badge = document.createElement("span");
+    badge.className = `journal-state ${entry.status}`;
+    badge.textContent = entry.status.toUpperCase();
+    head.append(market, badge);
+    const thesis = document.createElement("p");
+    thesis.textContent = entry.thesis || "No thesis recorded";
+    const meta = document.createElement("p");
+    meta.className = "journal-meta";
+    meta.textContent = `${entry.side.toUpperCase()} · ${entry.notionalPaperUsdso} paper USDso · ${new Date(entry.recordedAt).toLocaleString()}`;
+    const tx = document.createElement("p");
+    tx.className = "journal-meta";
+    tx.textContent = `Placement: ${entry.placementHash}`;
+    card.append(head, thesis, meta, tx);
+    if (entry.cancellationHash) {
+      const cancel = document.createElement("p");
+      cancel.className = "journal-meta";
+      cancel.textContent = `Cancellation: ${entry.cancellationHash}`;
+      card.appendChild(cancel);
+    }
+    list.appendChild(card);
+  }
+}
+
+function saveJournalSnapshot(status: SessionJournalEntry["status"], cancellationHash?: string): void {
+  const evidence = state.evidence;
+  if (!evidence) return;
+  const entry: SessionJournalEntry = {
+    id: evidence.placement.hash,
+    recordedAt: new Date().toISOString(),
+    thesis: evidence.sessionPlan.thesis,
+    budgetPaperUsdso: evidence.sessionPlan.budgetPaperUsdso,
+    market: evidence.order.market,
+    side: evidence.order.side,
+    price: evidence.order.price,
+    quantity: evidence.order.quantity,
+    notionalPaperUsdso: evidence.order.notionalPaperUsdso,
+    placementHash: evidence.placement.hash,
+    cancellationHash: cancellationHash ?? evidence.cancellation?.hash,
+    status,
+  };
+  try {
+    const entries = readJournal().filter((item) => item.id !== entry.id);
+    localStorage.setItem(JOURNAL_KEY, JSON.stringify([entry, ...entries].slice(0, 50)));
+    renderJournal();
+  } catch {
+    // The on-chain workflow must not fail because browser storage is unavailable.
+  }
+}
+
+function exportJournal(): void {
+  const contents = JSON.stringify({
+    product: "Perps Practice Desk",
+    exportedAt: new Date().toISOString(),
+    network: { name: "Somnia Hideki / Tokyo testnet", chainId: CHAIN_ID },
+    note: "Local journal export. Status is based on this app's recorded read-back and is not a third-party audit.",
+    sessions: readJournal(),
+  }, null, 2) + "\n";
+  const blob = new Blob([contents], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "perps-practice-desk-journal.json";
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function setStatus(message: string, tone: "normal" | "success" | "error" = "normal"): void {
@@ -375,6 +537,7 @@ function getPublicClient() {
 
 async function requestPreflight(): Promise<any> {
   const payload = formPayload();
+  if (sessionThesis().length < 8) throw new Error("Write a short trade thesis (at least 8 characters) before checking an order.");
   if (!payload.accountAddress || !payload.symbol || !payload.side || !payload.price || !payload.quantity) {
     throw new Error("Enter the account, market, side, price and quantity first.");
   }
@@ -394,7 +557,7 @@ function capturePreflightDiagnostic(result: unknown): void {
   latestPreflightDiagnostic = {
     schemaVersion: 1,
     kind: "orderproof-preflight-diagnostic",
-    product: "OrderProof",
+    product: "Perps Practice Desk",
     recordedAt: new Date().toISOString(),
     network: { name: "Somnia Hideki / dreamDEX Tokyo testnet", chainId: CHAIN_ID },
     sdkVersion: "0.32.1",
@@ -466,7 +629,7 @@ function renderPreflight(result: any): void {
   $("#live-order-box").hidden = !passed;
   const summary = $("#live-order-summary");
   summary.textContent = passed
-    ? `${payloadText(result.order?.side)} ${safeText(result.order?.quantity)} ${safeText(result.market?.symbol)} at ${safeText(result.order?.price)} USDso. Order type: post-only limit. Testnet only; max notional ${MAX_ORDER_NOTIONAL} paper USDso.`
+    ? `${payloadText(result.order?.side)} ${safeText(result.order?.quantity)} ${safeText(result.market?.symbol)} at ${safeText(result.order?.price)} USDso. Order type: post-only limit. Testnet only; session budget ${sessionBudget()} paper USDso.`
     : "Fix the issue above, then run preflight again.";
   refreshPlaceButton();
 }
@@ -499,7 +662,7 @@ async function handlePreflight(event: SubmitEvent): Promise<void> {
   setTrace("#trace-order", "NOT RUN", "pending");
   setTrace("#trace-proof", "NOT VERIFIED", "pending");
   try {
-    const result = await requestPreflight();
+    const result = enforceSessionBudget(await requestPreflight());
     capturePreflightDiagnostic(result);
     renderPreflight(result);
   } catch (error) {
@@ -564,7 +727,7 @@ function saveEvidence(): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "orderproof-evidence-receipt.json";
+  link.download = "perps-practice-desk-evidence-receipt.json";
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -596,7 +759,7 @@ async function placeOrder(): Promise<void> {
       throw new Error("The checked account does not match the connected wallet. Nothing was sent.");
     }
 
-    const latest = await requestPreflight();
+    const latest = enforceSessionBudget(await requestPreflight());
     renderPreflight(latest);
     if (latest.pass !== true) throw new Error(latest.explanation || "The latest live preflight blocked this order.");
     const market = currentMarket();
@@ -611,8 +774,9 @@ async function placeOrder(): Promise<void> {
 
     const notionalRaw = (price * quantity) / (10n ** BigInt(market.baseDecimals));
     const notional = Number(formatUnits(notionalRaw, market.quoteDecimals));
-    if (!Number.isFinite(notional) || notional > MAX_ORDER_NOTIONAL + 0.001) {
-      throw new Error(`Safety stop: estimated order value must stay at or below ${MAX_ORDER_NOTIONAL} paper USDso.`);
+    const budget = sessionBudget();
+    if (!Number.isFinite(notional) || notional > budget + 0.001 || notional > MAX_ORDER_NOTIONAL + 0.001) {
+      throw new Error(`Safety stop: estimated order value ${notional.toFixed(4)} must stay within your ${budget} paper USDso session budget and the hard ${MAX_ORDER_NOTIONAL} USDso app cap.`);
     }
 
     const confirmation =
@@ -727,11 +891,12 @@ async function placeOrder(): Promise<void> {
     };
 
     state.evidence = {
-      product: "OrderProof",
+      product: "Perps Practice Desk",
       recordedAt: new Date().toISOString(),
       network: { name: "Somnia Hideki / Tokyo testnet", chainId: CHAIN_ID },
       sdkVersion: "0.32.1",
       account,
+      sessionPlan: { thesis: sessionThesis(), budgetPaperUsdso: sessionBudget() },
       order: {
         market: `${market.baseSymbol}-PERP`,
         sdkSymbol: state.activeOrder.sdkSymbol,
@@ -762,6 +927,8 @@ async function placeOrder(): Promise<void> {
         fills === 0 ? "The SDK reported no immediate fills." : fills == null ? "Fill count could not be decoded." : `The SDK reported ${fills} fill(s); inspect account positions immediately.`,
       ],
     };
+
+    saveJournalSnapshot("pending");
 
     clearLiveDetails();
     appendDetail("Network", "Somnia Hideki / Tokyo testnet (50383)");
@@ -838,6 +1005,8 @@ async function cancelOrder(): Promise<void> {
         (state.evidence.order.fillsReportedBySdk ?? 0) === 0;
       state.evidence.recordedAt = new Date().toISOString();
     }
+
+    saveJournalSnapshot(state.evidence?.verification.verified ? "verified" : "incomplete", hash);
 
     clearLiveDetails();
     appendDetail("Order ID", order.id);
@@ -941,7 +1110,7 @@ function invalidatePreflightOnEdit(): void {
   refreshPlaceButton();
 }
 
-for (const selector of ["#account-address", "#market-select", "#side-select", "#price-input", "#quantity-input"]) {
+for (const selector of ["#account-address", "#market-select", "#side-select", "#price-input", "#quantity-input", "#session-thesis", "#session-budget"]) {
   $(selector).addEventListener("input", invalidatePreflightOnEdit);
   $(selector).addEventListener("change", invalidatePreflightOnEdit);
 }
@@ -977,6 +1146,7 @@ $("#cancel-order").addEventListener("click", () => {
 });
 $("#download-receipt").addEventListener("click", saveEvidence);
 $("#download-preflight-diagnostic").addEventListener("click", savePreflightDiagnostic);
+$("#export-journal").addEventListener("click", exportJournal);
 $("#receipt-file").addEventListener("change", (event) => {
   handleReceipt(event).catch((error) => setStatus(error instanceof Error ? error.message : String(error), "error"));
 });
@@ -1002,4 +1172,5 @@ if (window.ethereum?.on) {
 }
 
 updateWalletUI();
+renderJournal();
 loadMarkets();
