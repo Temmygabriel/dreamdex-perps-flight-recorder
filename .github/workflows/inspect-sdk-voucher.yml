@@ -22,12 +22,22 @@ jobs:
           grep -R -n -E "error [A-Za-z_][A-Za-z0-9_]*\(" node_modules/@somnia-chain/markets-sdk/dist --include='*.js' | head -150
           node --input-type=module - <<'NODE'
           import { toFunctionSelector } from "viem";
-          const names = ["ClaimantNotFlat","ClaimantIsMainFunded","AlreadyClaimed","CampaignInactive","InsufficientBudget","BudgetExhausted","NotFlat","NotEligible","VoucherNotEligible","InvalidClaim","ClaimDisabled","ClaimPaused","Unauthorized","ReentrancyGuardReentrantCall","PausableEnforcedPause","TransferFailed","SafeERC20FailedOperation","OwnableUnauthorizedAccount","InvalidAccount","NoCredit","InsufficientBalance"];
+          import { contractErrorsAbi } from "@somnia-chain/markets-sdk";
+          const target = "0x3e31dcc2";
+          const known = new Set();
+          for (const item of contractErrorsAbi) {
+            if (item.type !== "error") continue;
+            const sig = `${item.name}(${(item.inputs ?? []).map((input) => input.type).join(",")})`;
+            known.add(sig);
+            if (toFunctionSelector(sig).toLowerCase() === target) console.log("SDK ABI MATCH", sig);
+          }
+          const names = ["ClaimantNotFlat","ClaimantIsMainFunded","AlreadyClaimed","CampaignInactive","InsufficientBudget","BudgetExhausted","NotFlat","NotEligible","VoucherNotEligible","InvalidClaim","ClaimDisabled","ClaimPaused","Unauthorized","ReentrancyGuardReentrantCall","PausableEnforcedPause","TransferFailed","SafeERC20FailedOperation","OwnableUnauthorizedAccount","InvalidAccount","NoCredit","InsufficientBalance","ClaimantHasPositions","ClaimantHasOpenOrders","VoucherClaimNotAllowed","ClaimWindowClosed","ClaimWindowNotOpen","CampaignNotActive","CampaignNotStarted","ClaimExpired","CreditUnavailable","InsufficientCredit","NoCreditAvailable","InvalidCampaign","InvalidDistributor","NotAuthorized","AccessControlUnauthorizedAccount"];
           for (const name of names) {
-            for (const sig of [name+"()", name+"(address)", name+"(uint256)"]) {
-              if (toFunctionSelector(sig).toLowerCase() === "0x3e31dcc2") console.log("MATCH", sig);
+            for (const sig of [name+"()", name+"(address)", name+"(uint256)", name+"(address,uint256)"]) {
+              if (toFunctionSelector(sig).toLowerCase() === target) console.log("CANDIDATE MATCH", sig);
             }
           }
+          console.log("ABI error count:", contractErrorsAbi.filter((item) => item.type === "error").length);
           NODE
           sed -n '1,220p' node_modules/@somnia-chain/markets-sdk/dist/perp/voucher.js
           sed -n '1,160p' node_modules/@somnia-chain/markets-sdk/dist/perp/voucher.d.ts
