@@ -123,3 +123,24 @@ test("keeps the mobile UI spaced and free of leaked glyphs", async ({ page }) =>
   expect(dimensions.cardRects[0].top).toBe(dimensions.cardRects[1].top);
   expect(dimensions.cardRects[2].top).toBeGreaterThan(dimensions.cardRects[0].top);
 });
+
+test("switches between light and dim mode and keeps the selected theme after reload", async ({ page }) => {
+  const root = page.locator("html");
+  const toggle = page.getByRole("button", { name: "Switch to dim mode" });
+  await expect(root).toHaveAttribute("data-theme", "light");
+  await expect(page.locator("#theme-toggle-label")).toHaveText("Dim mode");
+
+  await toggle.click();
+  await expect(root).toHaveAttribute("data-theme", "dim");
+  await expect(page.getByRole("button", { name: "Switch to light mode" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#theme-toggle-label")).toHaveText("Light mode");
+  const dimPanel = await page.locator(".position-panel").evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(dimPanel).not.toBe("rgb(255, 255, 255)");
+
+  await page.reload();
+  await expect(root).toHaveAttribute("data-theme", "dim");
+  await expect(page.locator("#theme-toggle-label")).toHaveText("Light mode");
+  await page.getByRole("button", { name: "Switch to light mode" }).click();
+  await expect(root).toHaveAttribute("data-theme", "light");
+  await expect(page.locator("#theme-toggle-label")).toHaveText("Dim mode");
+});

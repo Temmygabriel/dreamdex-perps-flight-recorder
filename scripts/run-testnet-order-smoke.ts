@@ -58,6 +58,58 @@ function stringify(value: unknown): string {
   return JSON.stringify(value, (_key, item) => typeof item === "bigint" ? item.toString() : item, 2);
 }
 
+function extractRevertSelector(error: unknown): string | null {
+  const queue: unknown[] = [error];
+  const seen = new Set<unknown>();
+  for (let depth = 0; queue.length && depth < 80; depth += 1) {
+    const current = queue.shift();
+    if (!current || seen.has(current)) continue;
+    if (typeof current === "string") {
+      const matches = current.match(/0x[0-9a-fA-F]{8,}/g);
+      if (matches?.length) {
+        const known = matches.find((value) => value.slice(0, 10).toLowerCase() === "0x3e31dcc2");
+        return (known ?? matches[0]).slice(0, 10).toLowerCase();
+      }
+      continue;
+    }
+    if (typeof current !== "object") continue;
+    seen.add(current);
+    const record = current as Record<string, unknown>;
+    for (const key of ["data", "cause", "error", "details", "shortMessage", "message", "raw", "metaMessages"]) {
+      if (key in record) queue.push(record[key]);
+    }
+  }
+  return null;
+}
+
+async function preflightVoucherClaim(
+  publicClient: ReturnType<typeof createPublicClient>,
+  distributor: `0x${string}`,
+  account: ReturnType<typeof privateKeyToAccount>,
+): Promise<void> {
+  try {
+    await publicClient.simulateContract({
+      address: distributor,
+      abi: parseAbi(["function claim()"]),
+      functionName: "claim",
+      account,
+      gas: 1_000_000n,
+    });
+  } catch (error) {
+    const selector = extractRevertSelector(error);
+    if (selector === "0x3e31dcc2") {
+      throw new Error(
+        "Known Hideki VoucherDistributor blocker: read-only eth_call of claim() reverted with 0x3e31dcc2, despite SDK eligibility=true. " +
+        "No transaction was broadcast. This is a contract-side/SDK-preflight mismatch; an operator must fix the distributor configuration or issue the paper-USDso credit before order E2E can continue.",
+      );
+    }
+    throw new Error(
+      `VoucherDistributor read-only claim preflight reverted${selector ? ` with ${selector}` : " with an undecoded error"}. ` +
+      "No transaction was broadcast; investigate this result before trying the SDK claim.",
+    );
+  }
+}
+
 async function main(): Promise<void> {
   if (process.env.CONFIRM_LIVE_TEST_ORDER !== "YES") {
     throw new Error("Safety stop: set the manual workflow confirmation to YES before any transaction can be sent.");
@@ -120,8 +172,10 @@ async function main(): Promise<void> {
       if (!campaign) throw new Error("Voucher eligibility was true but no live campaign was resolved; stopping before any transaction.");
       const voucherState = await exchange.client.getPerpVoucher(market.marginBank, account.address);
       if (voucherState?.claimed) throw new Error("The current account is already marked as having claimed this voucher; stopping before any transaction.");
-      console.log("Perps voucher is eligible. Claiming the one-time testnet paper-USDso voucher as explicitly approved by this manual workflow.");
+      console.log("Perps voucher is eligible according to the SDK. Preflighting the distributor's claim() with read-only eth_call before allowing any write.");
       console.log("Using the exact distributor resolved from the live campaign; the account remains on Hideki testnet.");
+      await preflightVoucherClaim(publicClient, campaign.distributor as `0x${string}`, account);
+      console.log("Voucher claim preflight passed. Only now may the explicitly confirmed SDK claim be attempted.");
       let claimResult;
       try {
         claimResult = await exchange.trader.claimPerpVoucher({ distributor: campaign.distributor });
