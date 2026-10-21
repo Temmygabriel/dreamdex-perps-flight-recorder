@@ -5,7 +5,6 @@
   "type": "module",
   "description": "Transparent position stress scenarios for dreamDEX Perps on Somnia Hideki testnet.",
   "scripts": {
-    "preflight": "tsx src/preflight.ts",
     "check:wallet": "tsx scripts/check-test-wallet.ts",
     "test": "vitest run",
     "test:watch": "vitest",
