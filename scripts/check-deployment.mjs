@@ -50,7 +50,7 @@ async function probeRoot() {
 async function main() {
   const rootProbe = await probeRoot();
   if (rootProbe.status === 200 && rootProbe.stressLabBranding) {
-    const cssHref = rootProbe.html.match(/href=["']([^"']+\\.css(?:\\?[^"']*)?)["']/i)?.[1];
+    const cssHref = rootProbe.html.match(/href=["']([^"']+\.css(?:\?[^"']*)?)["']/i)?.[1];
     if (!cssHref) throw new Error("Production HTML did not reference a bundled stylesheet; the UI may render unstyled.");
     const cssResponse = await fetch(new URL(cssHref, base), {
       cache: "no-store",
