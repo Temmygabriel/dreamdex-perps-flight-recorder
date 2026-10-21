@@ -1,17 +1,20 @@
 {
-  "name": "dreamdex-perps-flight-recorder",
+  "name": "perps-stress-lab",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Testnet-first order preflight and execution evidence for dreamDEX perpetuals.",
+  "description": "Transparent position stress scenarios for dreamDEX Perps on Somnia Hideki testnet.",
   "scripts": {
-    "preflight": "tsx src/preflight.ts",
+    "check:wallet": "tsx scripts/check-test-wallet.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "test:e2e": "playwright test",
+    "check:perps-readiness": "tsx scripts/check-perps-readiness.ts",
+    "testnet:order-smoke": "tsx scripts/run-testnet-order-smoke.ts"
   },
   "dependencies": {
     "@somnia-chain/markets-sdk": "0.32.1",
@@ -22,7 +25,8 @@
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
     "vitest": "^3.2.4",
-    "vite": "8.3.4"
+    "vite": "8.3.4",
+    "@playwright/test": "1.55.0"
   },
   "engines": {
     "node": ">=20.19.0"

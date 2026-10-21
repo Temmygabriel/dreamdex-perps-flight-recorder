@@ -14,7 +14,7 @@ jobs:
   checks:
     name: Typecheck and deterministic tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -33,12 +33,12 @@ jobs:
       - name: Production frontend build
         run: npm run build
 
-      - name: Test pure order checks
+      - name: Test deterministic scenario model
         run: npm test
 
   testnet-read-only:
     name: Optional read-only testnet check
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'rebuild/perps-stress-lab')
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -56,9 +56,83 @@ jobs:
       - name: Install packages
         run: npm install --no-audit --no-fund
 
-      - name: Read-only SDK preflight
-        run: npm run preflight
-
       - name: Check market minimums against live books (read-only)
         run: npx tsx scripts/inspect-market-minimums.ts
 
+
+  test-wallet-read-only:
+    name: Optional funded test wallet check (read-only)
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'rebuild/perps-stress-lab')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install packages
+        run: npm install --no-audit --no-fund
+
+      - name: Derive wallet address and check native testnet balance (no transaction)
+        env:
+          WALLET_KEY: ${{ secrets.wallet_key }}
+        run: npm run check:wallet
+
+      - name: Read Perps voucher eligibility and maximum order-size gate (no transaction)
+        env:
+          WALLET_KEY: ${{ secrets.wallet_key }}
+        run: npm run check:perps-readiness
+
+  deployed-preview-read-only:
+    name: Deployed preview market and price smoke check
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'rebuild/perps-stress-lab'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    env:
+      STRESS_LAB_DEPLOYMENT_URL: https://dreamdex-perps-flight-recorde-git-92a078-temmygabriels-projects.vercel.app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify deployed read-only market and midpoint APIs
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node scripts/check-deployment.mjs
+
+  browser-e2e:
+    name: Browser interaction smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install packages
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser interaction tests
+        run: npm run test:e2e
