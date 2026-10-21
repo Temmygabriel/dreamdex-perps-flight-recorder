@@ -83,3 +83,25 @@ jobs:
         env:
           WALLET_KEY: ${{ secrets.wallet_key }}
         run: npm run check:wallet
+
+  deployed-preview-read-only:
+    name: Deployed preview market and price smoke check
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'rebuild/perps-stress-lab'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    env:
+      STRESS_LAB_DEPLOYMENT_URL: https://dreamdex-perps-flight-recorde-git-92a078-temmygabriels-projects.vercel.app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify deployed read-only market and midpoint APIs
+        run: node scripts/check-deployment.mjs
