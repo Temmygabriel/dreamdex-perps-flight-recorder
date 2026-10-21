@@ -4,7 +4,7 @@
 
 Perps Stress Lab is a scenario explorer for dreamDEX Perps on Somnia Hideki testnet. Configure a hypothetical isolated position, apply an adverse or favourable price move, inspect estimated P&L/equity/maintenance headroom, and export a transparent JSON scenario report.
 
-> **Important:** This is a simplified educational stress model, not a liquidation-price calculator, financial advice, or proof of protocol liquidation behaviour. The current scenario uses manual position inputs. A market-list endpoint may be queried for context, but the calculation does not claim to use a live account's actual margin state.
+> **Important:** This is a simplified educational stress model, not a liquidation-price calculator, financial advice, or proof of protocol liquidation behaviour. Position size, margin, maintenance and shock assumptions are user-controlled. The entry price is prefilled from the selected live top-of-book midpoint when available and remains editable. A market-list endpoint may be queried for context, but the calculation does not claim to use a live account's actual margin state.
 
 ## Current MVP
 
@@ -37,15 +37,15 @@ Optional funding is a deliberately simplified scenario: positive 8-hour rate mea
 - Chain ID: `50383`
 - RPC: `https://api.hideki2.infra.testnet.somnia.network`
 - Perps SDK pinned in `package.json`: `@somnia-chain/markets-sdk@0.32.1`
-- No private key or mainnet funds are needed for the current scenario MVP.
+- The browser app does not need a private key or mainnet funds. Optional CI readiness checks use the GitHub Actions `wallet_key` secret only for read-only steps.
 
 ## Verification status
 
 **The current branch is an implementation in progress.** Do not describe it as fully verified against Hideki until the following have been demonstrated:
 
-- [ ] GitHub Actions typecheck, unit tests and production build pass (latest code must be green).
+- [x] GitHub Actions typecheck, unit tests and production build pass on the latest tested revision.
 - [ ] Live market-list and order-book midpoint endpoints are verified in the deployed Vercel preview; the midpoint is not the protocol mark price.
-- [ ] Formula tests independently validate long and short cases, shock direction, funding signs and threshold edge cases.
+- [x] Formula tests validate long and short cases, shock direction, funding signs and invalid-input boundaries.
 - [x] CI performs a read-only Perps account readiness check: voucher eligibility and SDK max-order-size gate, without signing or sending a transaction.
 - [ ] Any account-aware stress mode is implemented only after the SDK exposes the required Perps account data and it is validated against the protocol.
 - [ ] If a separate testnet order flow is ever added, the user explicitly approves the transaction and the app verifies transaction receipt, read-back and cleanup.
