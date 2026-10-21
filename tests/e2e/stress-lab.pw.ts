@@ -129,6 +129,11 @@ test("keeps the mobile UI spaced and free of leaked glyphs", async ({ page }) =>
       const rect = el.getBoundingClientRect();
       return { tag: el.tagName, id: el.id, cls: typeof el.className === "string" ? el.className : "", left: Math.round(rect.left), right: Math.round(rect.right), width: Math.round(rect.width), scrollWidth: (el as HTMLElement).scrollWidth };
     }).filter((el) => el.right > document.documentElement.clientWidth + 1 || el.left < -1).slice(0, 18),
+    scrollers: Array.from(document.querySelectorAll("body *")).map((el) => {
+      const node = el as HTMLElement;
+      const style = getComputedStyle(node);
+      return { tag: el.tagName, id: el.id, cls: typeof el.className === "string" ? el.className : "", clientWidth: node.clientWidth, scrollWidth: node.scrollWidth, overflowX: style.overflowX };
+    }).filter((el) => el.scrollWidth > el.clientWidth + 4 && el.overflowX === "visible").slice(0, 18),
   }));
   console.log("MOBILE_LAYOUT_DIAGNOSTIC", JSON.stringify(dimensions));
   expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
