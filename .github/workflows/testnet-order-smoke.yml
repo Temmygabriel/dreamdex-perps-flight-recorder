@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Confirm that no transaction will be sent
-        run: echo "No transaction sent. Re-run manually and select YES only after replacing wallet_key with a fresh dedicated testnet-only key."
+        run: echo "No transaction sent. Re-run manually and select YES only when authorizing the bounded Hideki testnet order lifecycle with the configured wallet_key secret."
 
   testnet-order:
     name: Claim voucher if eligible, place and cancel one capped order
