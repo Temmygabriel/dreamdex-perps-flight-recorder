@@ -92,6 +92,15 @@ describe("GET /api/market-price", () => {
     expect(mocks.close).toHaveBeenCalledOnce();
   });
 
+  it("does not leak raw upstream exception details to API clients", async () => {
+    mocks.listPerpMarkets.mockRejectedValue(new Error("private upstream URL and internal query details"));
+    const { res, state } = responseHarness();
+    await handler({ method: "GET", query: { symbol: "BTC-USDso" } } as never, res);
+    expect(state.statusCode).toBe(502);
+    expect(state.body).toMatchObject({ ok: false, error: "Order-book data is temporarily unavailable. Please retry shortly." });
+    expect(JSON.stringify(state.body)).not.toContain("private upstream URL");
+  });
+
   it("fails closed when the order book is not two-sided", async () => {
     mocks.fetchOrderBook.mockResolvedValue({ bids: [], asks: [[100_100, 1]] });
     const { res, state } = responseHarness();
