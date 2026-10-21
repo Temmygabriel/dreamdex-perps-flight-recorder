@@ -279,3 +279,55 @@ footer { border-color: #dce3ed; color: #738198; }
 
 #download-preflight-diagnostic[hidden] { display: none; }
 .preflight-evidence-button { margin-top: 12px; width: 100%; }
+
+
+/* Perps Practice Desk session planning and journal */
+.session-plan {
+  margin: 0 0 25px;
+  padding: 19px;
+  background: #ece8dd;
+  border: 1px solid var(--line);
+}
+.session-plan-heading, .journal-heading, .journal-entry-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+.session-plan h3, .journal-panel h3 { margin: 0; font: 500 25px/1.1 var(--serif); }
+.session-plan label { display: block; margin: 17px 0 7px; color: var(--ink); font-size: 12px; font-weight: 700; }
+.session-plan label span { float: right; color: var(--muted); font: 9px var(--mono); letter-spacing: .06em; }
+.session-plan input, .session-plan select {
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 12px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid #c9c4b7;
+  border-radius: 0;
+}
+.session-plan input:focus, .session-plan select:focus { outline: 2px solid var(--copper); outline-offset: 1px; }
+.session-plan .field-row { margin-top: 2px; }
+.plan-status { display: flex; flex-direction: column; justify-content: center; gap: 7px; padding-top: 15px; }
+.plan-status strong { font-size: 12px; }
+.session-plan-note { margin: 13px 0 0; color: var(--muted); font-size: 11px; }
+.journal-panel { margin-top: 28px; padding-top: 25px; border-top: 1px solid var(--line); }
+.journal-actions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.journal-list { display: grid; gap: 10px; }
+.journal-empty { margin: 0; padding: 20px; color: var(--muted); background: rgba(255,255,255,.35); border: 1px dashed var(--line); font-size: 12px; }
+.journal-entry { min-width: 0; padding: 15px; background: var(--paper); border: 1px solid var(--line); }
+.journal-entry p { margin: 8px 0 0; overflow-wrap: anywhere; }
+.journal-entry-head { align-items: center; }
+.journal-entry-head strong { font: 500 16px var(--serif); }
+.journal-state { flex: 0 0 auto; padding: 4px 7px; font: 9px var(--mono); letter-spacing: .06em; border: 1px solid var(--line); }
+.journal-state.verified { color: var(--green); background: var(--soft-green); border-color: #c4d7c9; }
+.journal-state.pending { color: var(--copper-dark); background: #f5eee5; border-color: #ddc8b6; }
+.journal-state.incomplete { color: var(--red); background: var(--soft-red); border-color: #e5c5bc; }
+.journal-meta { color: var(--muted); font: 10px/1.5 var(--mono); }
+@media (max-width: 680px) {
+  .session-plan { padding: 14px; }
+  .session-plan-heading, .journal-heading { flex-direction: column; }
+  .session-plan label span { float: none; display: block; margin-top: 3px; }
+  .plan-status { padding-top: 0; min-height: 50px; }
+  .journal-actions { width: 100%; justify-content: space-between; }
+}
