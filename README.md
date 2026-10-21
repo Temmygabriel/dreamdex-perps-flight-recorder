@@ -8,7 +8,7 @@ Perps Stress Lab is a scenario explorer for dreamDEX Perps on Somnia Hideki test
 
 ## Current MVP
 
-- Responsive dark product interface and branded identity.
+- Responsive light/dim product interface with an accessible toggle and locally persisted theme preference.
 - Long/short hypothetical position inputs.
 - Adjustable price shock from −50% to +50%.
 - Editable starting margin and maintenance assumptions.
@@ -50,14 +50,14 @@ Optional funding is a deliberately simplified scenario: positive 8-hour rate mea
 - [ ] Any account-aware stress mode is implemented only after the SDK exposes the required Perps account data and it is validated against the protocol.
 - [ ] The bounded testnet order workflow was executed twice against the configured test wallet, but both attempts stopped at the voucher `eth_call` simulation with unknown custom error selector `0x3e31dcc2`; no order-placement or cancellation transaction was submitted. Order lifecycle remains unverified and the voucher claim must be diagnosed with dreamDEX before retrying.
 - [ ] Public Vercel deployment is tested on desktop and mobile.
-- [ ] Playwright browser tests cover live-price prefill, long/short P&L direction, honest JSON export flags, and 360–390px mobile layout. The new mobile styling tests are being used to close the final horizontal-overflow regression before this item is marked complete.
+- [x] Playwright browser tests cover live-price prefill, long/short P&L direction, honest JSON export flags, 360–390px mobile layout, and persisted light/dim theme switching.
 - [ ] Deployed preview smoke check confirms the Vercel serverless endpoints are live and returning fresh Hideki data. The preview is currently access-protected; the preview check reports a skip unless `VERCEL_AUTOMATION_BYPASS_SECRET` is configured in GitHub Actions. A separate read-only check now also runs against the production URL after pushes to main.
 
 A successful market read does not validate the stress model. A successful order does not prove liquidation accuracy. The model must not claim protocol-accurate liquidation prediction without independently validated account-equity rules, fees, funding, cross-margin interactions and liquidation-engine behaviour.
 
 ## Manual testnet order lifecycle (blocked at voucher claim)
 
-The repository includes [a manually gated GitHub Actions workflow](.github/workflows/testnet-order-smoke.yml) that preflights the paper-USDso voucher, then places one capped POST_ONLY BTC order and cancels it. I also attempted a one-time authorized run using the configured GitHub secret. The SDK reports `claim reverted: for an unknown reason` with raw revert data `0x3e31dcc2` during `eth_call`; the published SDK preflight still reports eligible, the campaign has ample budget, the voucher is unclaimed, and the wallet has no BTC open orders. The script now resolves the live campaign distributor explicitly and logs safe structured error details. Do not retry until the contract-side revert is decoded.
+The repository includes [a manually gated GitHub Actions workflow](.github/workflows/testnet-order-smoke.yml) that preflights the paper-USDso voucher, then places one capped POST_ONLY BTC order and cancels it. I also attempted a one-time authorized run using the configured GitHub secret. The SDK reports `claim reverted: for an unknown reason` with raw revert data `0x3e31dcc2` during `eth_call`; the published SDK preflight still reports eligible, the campaign has ample budget, the voucher is unclaimed, and the wallet has no BTC open orders. This matches independently published Hideki reproductions: [eligibility reports true while self-claim reverts](https://github.com/MrTimonM/findings/blob/6b42ad2df15b53b513783f554001d9692dc94fc3/feedback/01-voucher-eligibility-says-eligible-but-claim-always-reverts.md) and [the SDK cannot decode the VoucherDistributor selector](https://github.com/MrTimonM/findings/blob/6b42ad2df15b53b513783f554001d9692dc94fc3/feedback/08-sdk-cannot-decode-voucher-distributor-error.md). The smoke script now runs a read-only `claim()` preflight on the resolved distributor and stops before a write if this known selector is returned. This is a deployed contract/configuration + SDK eligibility mismatch, not a parameter typo we can repair from this application repository. A protocol operator needs to repair the distributor path or issue the paper-USDso credit through its supported admin route. Do not retry a state-changing claim until that happens.
 
 Before running it:
 1. Confirm `wallet_key` contains a wallet funded for Hideki testnet only. The secret is injected only into the transaction step; it is never printed or uploaded.
@@ -65,7 +65,7 @@ Before running it:
 3. After this branch is merged, open Actions → **Perps Stress Lab testnet order smoke** → Run workflow. Select `YES` only when authorizing the voucher claim (if eligible), one 10–15 USDso-equivalent POST_ONLY order, and cancellation.
 4. Inspect the uploaded receipt. A transaction hash alone is not enough: the test passes only if the order appears in open-order read-back, is cancelled, disappears from read-back, and reports zero fills.
 
-The attempted runs did not broadcast a claim or order transaction because the claim simulation reverted first. The receipt contains no transaction hashes. Never use a private key that controls mainnet funds.
+The attempted runs did not broadcast a claim or order transaction because the claim simulation reverted first. The receipt contains no transaction hashes. The order lifecycle is therefore still blocked and cannot honestly be marked end-to-end passed. Never use a private key that controls mainnet funds.
 
 ## Security and dependency audit\n\nCI now runs `npm audit --audit-level=high` and verifies the installed dependency tree. The repository currently has no committed `package-lock.json`; the audit job generates a temporary lockfile during CI. This detects known advisories for the resolved dependency tree in that run, but dependency versions are not yet reproducible across separate clean installs. Commit a reviewed lockfile before treating dependency resolution as fully reproducible. API handlers return generic upstream failure messages rather than exposing raw SDK exception strings.\n\n## Run checks
 
@@ -94,4 +94,4 @@ Run heavyweight checks in GitHub Actions if your local machine is resource-const
 **Perps Stress Lab**  
 *Stress-test before you trade.*
 
-The interface uses deep navy, restrained violet highlights, high-contrast scenario values and monospace calculation details. Its purpose is to help a trader or judge understand the workflow in seconds: configure a position → apply stress → inspect the math → export a report.
+The interface uses a clean light palette with an optional subdued slate dim palette, high-contrast scenario values and monospace calculation details. Its purpose is to help a trader or judge understand the workflow in seconds: configure a position → apply stress → inspect the math → export a report.
