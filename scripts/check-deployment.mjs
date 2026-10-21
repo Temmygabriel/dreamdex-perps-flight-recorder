@@ -36,11 +36,12 @@ async function probeRoot() {
       finalUrl: response.url,
       stressLabBranding: html.includes("Perps Stress Lab"),
       contentType: response.headers.get("content-type") ?? "unknown",
+      html,
     };
     console.log(`Deployment root probe: HTTP ${result.status}; Stress Lab branding: ${result.stressLabBranding}; content type: ${result.contentType}`);
     return result;
   } catch (error) {
-    const result = { status: 0, finalUrl: base, stressLabBranding: false, contentType: "unavailable" };
+    const result = { status: 0, finalUrl: base, stressLabBranding: false, contentType: "unavailable", html: "" };
     console.log("Deployment root probe failed:", error instanceof Error ? error.message : "unknown error");
     return result;
   }
@@ -48,6 +49,20 @@ async function probeRoot() {
 
 async function main() {
   const rootProbe = await probeRoot();
+  if (rootProbe.status === 200 && rootProbe.stressLabBranding) {
+    const cssHref = rootProbe.html.match(/href=["']([^"']+\\.css(?:\\?[^"']*)?)["']/i)?.[1];
+    if (!cssHref) throw new Error("Production HTML did not reference a bundled stylesheet; the UI may render unstyled.");
+    const cssResponse = await fetch(new URL(cssHref, base), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    });
+    const cssText = await cssResponse.text();
+    if (!cssResponse.ok || !(cssResponse.headers.get("content-type") ?? "").includes("text/css") ||
+        !cssText.includes(".metric-grid") || !cssText.includes(".toggle")) {
+      throw new Error(`Bundled stylesheet failed verification: HTTP ${cssResponse.status}; content type ${cssResponse.headers.get("content-type") ?? "unknown"}.`);
+    }
+    console.log(`Bundled stylesheet probe: HTTP ${cssResponse.status}; layout rules present.`);
+  }
   let marketsPayload;
   let lastError;
   for (let attempt = 1; attempt <= 8; attempt++) {
@@ -96,7 +111,7 @@ async function main() {
     throw new Error("Order-book endpoint returned invalid, stale, or wrong-network data.");
   }
 
-  console.log("DEPLOYED PREVIEW READ-ONLY SMOKE CHECK PASSED");
+  console.log("DEPLOYED READ-ONLY SMOKE CHECK PASSED");
   console.log(`Deployment: ${base}`);
   console.log(`Network: Somnia Hideki testnet (chain ID ${marketsPayload.network.chainId})`);
   console.log(`Live markets returned: ${marketsPayload.count}`);
