@@ -14,9 +14,9 @@ function num(id:string):number { return Number($<HTMLInputElement | HTMLSelectEl
 function val(id:string):string { return $<HTMLInputElement | HTMLSelectElement>(id).value; }
 function setText(id:string,value:string){ $<HTMLElement>(id).textContent=value; }
 function readInputs(){
-  const entry=num("entry"), quantity=num("quantity"), leverage=num("leverage"), marginPercent=num("starting-margin"), shock=num("shock"), maintenance=num("maintenance");
+  const entry=num("entry"), quantity=num("quantity"), marginPercent=num("starting-margin"), shock=num("shock"), maintenance=num("maintenance");
   const fundingEnabled=$<HTMLInputElement>("funding-toggle").checked, fundingRate=num("funding-rate"), periods=num("funding-periods");
-  if (![entry,quantity,leverage,marginPercent,shock,maintenance].every(Number.isFinite) || entry<=0 || quantity<=0 || leverage<=0 || marginPercent<=0 || maintenance<=0 || maintenance>50) throw new Error("Enter positive prices and quantities, a positive margin, and a maintenance rate between 0 and 50%.");
+  if (![entry,quantity,marginPercent,shock,maintenance].every(Number.isFinite) || entry<=0 || quantity<=0 || marginPercent<=0 || maintenance<=0 || maintenance>50) throw new Error("Enter positive prices and quantities, a positive margin, and a maintenance rate between 0 and 50%.");
   if (fundingEnabled && (!Number.isFinite(fundingRate) || !Number.isFinite(periods))) throw new Error("Check the funding inputs.");
   return {entry,quantity,leverage,marginPercent,shock,maintenance,fundingEnabled,fundingRate,periods};
 }
@@ -40,7 +40,7 @@ function compute(){
     "Funding uses the entry notional, a constant user-entered 8h rate and full 8h periods; it is not a forecast of future rates.",
     "This result is not an official dreamDEX liquidation price or liquidation status."
   ];
-  return {createdAt:new Date().toISOString(),product:"Perps Stress Lab",version:"0.1.0",network:{name:"Somnia Hideki Testnet",chainId:50383},source:"manual-input",side,market,entryPrice:x.entry,quantity:x.quantity,leverage:x.leverage,startingMarginPercent:x.marginPercent,startingMarginUsd:startingMargin,shockPercent:x.shock,stressedPrice:stressed,pnlUsd:pnl,funding:{enabled:x.fundingEnabled,rate8hPercent:x.fundingRate,periods:x.periods,estimatedUsd:fundingUsd,assumption:x.fundingEnabled?"Constant rate over full 8h periods; calculated on entry notional.":"Funding excluded."},equityUsd:equity,maintenancePercent:x.maintenance,maintenanceUsd:maintenance,headroomUsd:headroom,thresholdStatus:headroom>0?"above-estimate":"at-or-below-estimate",assumptions} satisfies Scenario;
+  return {createdAt:new Date().toISOString(),product:"Perps Stress Lab",version:"0.1.0",network:{name:"Somnia Hideki Testnet",chainId:50383},source:"manual-input",side,market,entryPrice:x.entry,quantity:x.quantity,leverage:100/x.marginPercent,startingMarginPercent:x.marginPercent,startingMarginUsd:startingMargin,shockPercent:x.shock,stressedPrice:stressed,pnlUsd:pnl,funding:{enabled:x.fundingEnabled,rate8hPercent:x.fundingRate,periods:x.periods,estimatedUsd:fundingUsd,assumption:x.fundingEnabled?"Constant rate over full 8h periods; calculated on entry notional.":"Funding excluded."},equityUsd:equity,maintenancePercent:x.maintenance,maintenanceUsd:maintenance,headroomUsd:headroom,thresholdStatus:headroom>0?"above-estimate":"at-or-below-estimate",assumptions} satisfies Scenario;
 }
 function update(){
  try{
@@ -114,8 +114,9 @@ async function loadMarkets(){
 }
 document.querySelectorAll<HTMLButtonElement>("[data-side]").forEach(b=>b.addEventListener("click",()=>{side=b.dataset.side as Side;document.querySelectorAll("[data-side]").forEach(x=>x.classList.toggle("active",x===b));update();}));
 document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.addEventListener("click",()=>{ $<HTMLInputElement>("shock").value=b.dataset.shock!;update();}));
-["entry","quantity","leverage","maintenance","starting-margin","shock","funding-rate","funding-periods","market"].forEach(id=>$<HTMLInputElement | HTMLSelectElement>(id).addEventListener("input",update));
+["entry","quantity","maintenance","starting-margin","shock","funding-rate","funding-periods","market"].forEach(id=>$<HTMLInputElement | HTMLSelectElement>(id).addEventListener("input",update));
 $("funding-toggle").addEventListener("change",()=>{const enabled=$<HTMLInputElement>("funding-toggle").checked; $("funding-fields").setAttribute("aria-disabled",String(!enabled));$<HTMLInputElement>("funding-rate").disabled=!enabled;$<HTMLSelectElement>("funding-periods").disabled=!enabled;update();});
+$<HTMLSelectElement>("leverage").addEventListener("change",()=>{$<HTMLInputElement>("starting-margin").value=String(100/num("leverage"));update();});
 $("run-scenario").addEventListener("click",markRun);
 $("export-json").addEventListener("click",download);
 $("copy-summary").addEventListener("click",()=>void copySummary());
