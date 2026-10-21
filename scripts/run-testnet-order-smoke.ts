@@ -22,7 +22,6 @@ import { privateKeyToAccount } from "viem/accounts";
 const RPC_URL = "https://api.hideki2.infra.testnet.somnia.network";
 const INDEXER_URL = process.env.HIDEKI_INDEXER_URL ?? "https://hideki-dev.smk.somnia.host/v1/graphql";
 const WS_RPC_URL = "wss://api.hideki2.infra.testnet.somnia.network/ws";
-const BLOCKED_PREVIOUS_ADDRESS = "0x19393aEd711c5C17C8B62C4cB6Cc2c32A31B5f7A";
 const TARGET_NOTIONAL_USDSO = 12;
 const MAX_NOTIONAL_USDSO = 15;
 const PLACE_SELECTOR = "0x80054449" as const;
@@ -71,9 +70,6 @@ async function main(): Promise<void> {
   }
 
   const account = privateKeyToAccount(privateKey);
-  if (account.address.toLowerCase() === BLOCKED_PREVIOUS_ADDRESS.toLowerCase()) {
-    throw new Error("Safety stop: this is the previously tested key. Replace wallet_key with a fresh dedicated testnet-only key before any transaction.");
-  }
   const side = process.env.SMOKE_SIDE === "short" ? "short" : "long";
   const isBid = side === "long";
   const exchange = new SomniaMarkets({
