@@ -25,13 +25,6 @@ const pricePayload = {
 };
 
 test.beforeEach(async ({ page }) => {
-  page.on("pageerror", (error) => console.log("PAGE_ERROR", error.message));
-  page.on("console", (message) => { if (message.type() === "error") console.log("BROWSER_CONSOLE_ERROR", message.text()); });
-  page.on("response", (response) => {
-    if (response.url().includes("app.css") || response.url().includes("stress-lab.ts")) {
-      console.log("APP_ASSET_RESPONSE", response.status(), response.url(), response.headers()["content-type"] ?? "");
-    }
-  });
   await page.route("**/api/markets", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -118,24 +111,11 @@ test("keeps the mobile UI spaced and free of leaked glyphs", async ({ page }) =>
     viewport: document.documentElement.clientWidth,
     content: document.documentElement.scrollWidth,
     nav: getComputedStyle(document.querySelector(".nav-list")!).display,
-    gridDisplay: getComputedStyle(document.querySelector(".metric-grid")!).display,
-    gridColumns: getComputedStyle(document.querySelector(".metric-grid")!).gridTemplateColumns,
-    gridParent: document.querySelector(".metric-grid")?.parentElement?.className,
     cardRects: Array.from(document.querySelectorAll(".metric-card")).map((el) => {
       const rect = el.getBoundingClientRect();
       return { left: rect.left, top: rect.top, width: rect.width };
     }),
-    overflowers: Array.from(document.querySelectorAll("body *")).map((el) => {
-      const rect = el.getBoundingClientRect();
-      return { tag: el.tagName, id: el.id, cls: typeof el.className === "string" ? el.className : "", left: Math.round(rect.left), right: Math.round(rect.right), width: Math.round(rect.width), scrollWidth: (el as HTMLElement).scrollWidth };
-    }).filter((el) => el.right > document.documentElement.clientWidth + 1 || el.left < -1).slice(0, 18),
-    scrollers: Array.from(document.querySelectorAll("body *")).map((el) => {
-      const node = el as HTMLElement;
-      const style = getComputedStyle(node);
-      return { tag: el.tagName, id: el.id, cls: typeof el.className === "string" ? el.className : "", clientWidth: node.clientWidth, scrollWidth: node.scrollWidth, overflowX: style.overflowX };
-    }).filter((el) => el.scrollWidth > el.clientWidth + 4 && el.overflowX === "visible").slice(0, 18),
   }));
-  console.log("MOBILE_LAYOUT_DIAGNOSTIC", JSON.stringify(dimensions));
   expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
   expect(dimensions.nav).not.toBe("none");
   expect(dimensions.cardRects).toHaveLength(4);
