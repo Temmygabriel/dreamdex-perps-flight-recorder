@@ -109,6 +109,8 @@ jobs:
           node-version: 22
 
       - name: Verify deployed read-only market and midpoint APIs
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: node scripts/check-deployment.mjs
 
   browser-e2e:
