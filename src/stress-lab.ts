@@ -18,7 +18,7 @@ function readInputs(){
   const fundingEnabled=$<HTMLInputElement>("funding-toggle").checked, fundingRate=num("funding-rate"), periods=num("funding-periods");
   if (![entry,quantity,marginPercent,shock,maintenance].every(Number.isFinite) || entry<=0 || quantity<=0 || marginPercent<=0 || maintenance<=0 || maintenance>50) throw new Error("Enter positive prices and quantities, a positive margin, and a maintenance rate between 0 and 50%.");
   if (fundingEnabled && (!Number.isFinite(fundingRate) || !Number.isFinite(periods))) throw new Error("Check the funding inputs.");
-  return {entry,quantity,leverage,marginPercent,shock,maintenance,fundingEnabled,fundingRate,periods};
+  return {entry,quantity,marginPercent,shock,maintenance,fundingEnabled,fundingRate,periods};
 }
 function compute(){
   const x=readInputs();
