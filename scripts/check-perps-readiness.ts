@@ -39,6 +39,8 @@ async function main(): Promise<void> {
 
     const account = String(exchange.walletAddress ?? derivedAccount.address) as `0x${string}`;
     const eligibility = await exchange.client.getPerpVoucherEligibility(btc.marginBank, account);
+    const campaign = await exchange.client.getPerpVoucherCampaign(btc.marginBank);
+    const voucher = await exchange.client.getPerpVoucher(btc.marginBank, account);
     const sdkMarkets = await exchange.loadMarkets();
     const sdkMarket = Object.values(sdkMarkets).find((item: any) =>
       item.type === "swap" &&
@@ -68,6 +70,10 @@ async function main(): Promise<void> {
     console.log(`Best bid: ${bid} USDso`);
     console.log("Voucher eligibility:");
     console.log(json(eligibility));
+    console.log("Voucher campaign state:");
+    console.log(json(campaign));
+    console.log("Current account voucher state:");
+    console.log(json(voucher));
     console.log("SDK max-order-size gate:");
     console.log(json({
       priceable: (maxSize as any).priceable,
