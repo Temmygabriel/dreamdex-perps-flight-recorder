@@ -1,0 +1,26 @@
+name: Inspect SDK voucher implementation
+on:
+  push:
+    branches:
+      - ops/diagnose-voucher-readonly
+permissions:
+  contents: read
+jobs:
+  inspect:
+    if: github.event.head_commit.message == 'INSPECT SDK VOUCHER IMPLEMENTATION'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Print voucher method implementation and relevant SDK files (no wallet secret)
+        run: |
+          node --input-type=module - <<'NODE'
+          import { SomniaMarkets } from "@somnia-chain/markets-sdk";
+          console.log("claimPerpVoucher method source:");
+          console.log(String(SomniaMarkets.prototype?.trader?.claimPerpVoucher ?? "prototype path unavailable"));
+          NODE
+          grep -R -n -E "claimPerpVoucher|VoucherDistributor|claim reverted" node_modules/@somnia-chain/markets-sdk --include='*.js' --include='*.mjs' --include='*.d.ts' | head -100
