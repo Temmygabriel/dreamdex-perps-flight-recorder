@@ -1,0 +1,23 @@
+name: One-time read-only Perps voucher diagnostic
+on:
+  push:
+    branches:
+      - ops/diagnose-voucher-readonly
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    if: github.event.head_commit.message == 'RUN AUTHORIZED READ-ONLY VOUCHER DIAGNOSTIC'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install without wallet secret
+        run: npm install --no-audit --no-fund
+      - name: Read current wallet eligibility and order-size gate (no transaction)
+        env:
+          WALLET_KEY: ${{ secrets.wallet_key }}
+        run: npm run check:perps-readiness
