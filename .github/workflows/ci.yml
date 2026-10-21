@@ -11,6 +11,23 @@ permissions:
   contents: read
 
 jobs:
+  secret-scan:
+    name: Repository secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out full repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan repository history for committed secrets
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   dependency-security-audit:
     name: Dependency vulnerability audit
     runs-on: ubuntu-latest
