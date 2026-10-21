@@ -340,6 +340,29 @@ async function main(): Promise<void> {
   } catch (error) {
     failure = error instanceof Error ? error.message : "Unknown failure";
     console.error("FUNDED PERPS E2E FAILED:", failure);
+    if (placementTransaction && orderIdText && !cancellationTransaction && poolAddress) {
+      try {
+        const { request: cancelRequest } = await publicClient.simulateContract({
+          address: poolAddress,
+          abi: poolAbi,
+          functionName: "cancelOrder",
+          args: [BigInt(orderIdText)],
+          account,
+          gas: GAS_LIMIT,
+        });
+        const cleanupHash = await walletClient.writeContract(cancelRequest as never);
+        const cleanupReceipt = await publicClient.waitForTransactionReceipt({ hash: cleanupHash });
+        if (cleanupReceipt.status === "success") {
+          cancellationTransaction = cleanupHash;
+          console.error("Safety cleanup submitted successfully; cancellation tx:", cleanupHash);
+        } else {
+          console.error("URGENT: safety-cleanup cancellation receipt reverted:", cleanupHash);
+        }
+      } catch (cleanupError) {
+        console.error("URGENT: could not auto-cancel the test order. Inspect the wallet's BTC Perps open orders. Reason:",
+          cleanupError instanceof Error ? cleanupError.message : "unknown cleanup error");
+      }
+    }
     throw error;
   } finally {
     const receipt = {
