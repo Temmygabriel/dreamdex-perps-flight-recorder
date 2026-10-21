@@ -9,12 +9,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@somnia-chain/markets-sdk", () => ({
   SOMNIA_HIDEKI_TESTNET_ADDRESSES: {},
-  SomniaMarkets: vi.fn(() => ({
+  SomniaMarkets: vi.fn(function () {
     client: { listPerpMarkets: mocks.listPerpMarkets },
     loadMarkets: mocks.loadMarkets,
     fetchOrderBook: mocks.fetchOrderBook,
     close: mocks.close,
-  })),
+  }),
 }));
 
 vi.mock("@somnia-chain/markets-sdk/chains", () => ({
