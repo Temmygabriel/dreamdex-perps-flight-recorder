@@ -10,12 +10,12 @@ let markets:MarketRecord[] = [];
 let latest:Scenario | null = null;
 let lastRunAt:string | null = null;
 
-function num(id:string):number { return Number($(HTMLInputElement | HTMLSelectElement)(id).value); }
-function val(id:string):string { return $(HTMLInputElement | HTMLSelectElement)(id).value; }
-function setText(id:string,value:string){ $(HTMLElement)(id).textContent=value; }
+function num(id:string):number { return Number($<HTMLInputElement | HTMLSelectElement>(id).value); }
+function val(id:string):string { return $<HTMLInputElement | HTMLSelectElement>(id).value; }
+function setText(id:string,value:string){ $<HTMLElement>(id).textContent=value; }
 function readInputs(){
   const entry=num("entry"), quantity=num("quantity"), leverage=num("leverage"), marginPercent=num("starting-margin"), shock=num("shock"), maintenance=num("maintenance");
-  const fundingEnabled=$(HTMLInputElement)("funding-toggle").checked, fundingRate=num("funding-rate"), periods=num("funding-periods");
+  const fundingEnabled=$<HTMLInputElement>("funding-toggle").checked, fundingRate=num("funding-rate"), periods=num("funding-periods");
   if (![entry,quantity,leverage,marginPercent,shock,maintenance].every(Number.isFinite) || entry<=0 || quantity<=0 || leverage<=0 || marginPercent<=0 || maintenance<=0 || maintenance>50) throw new Error("Enter positive prices and quantities, a positive margin, and a maintenance rate between 0 and 50%.");
   if (fundingEnabled && (!Number.isFinite(fundingRate) || !Number.isFinite(periods))) throw new Error("Check the funding inputs.");
   return {entry,quantity,leverage,marginPercent,shock,maintenance,fundingEnabled,fundingRate,periods};
@@ -114,7 +114,7 @@ async function loadMarkets(){
 }
 document.querySelectorAll<HTMLButtonElement>("[data-side]").forEach(b=>b.addEventListener("click",()=>{side=b.dataset.side as Side;document.querySelectorAll("[data-side]").forEach(x=>x.classList.toggle("active",x===b));update();}));
 document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.addEventListener("click",()=>{ $("shock").value=b.dataset.shock!;update();}));
-["entry","quantity","leverage","maintenance","starting-margin","shock","funding-rate","funding-periods","market"].forEach(id=>$(HTMLInputElement | HTMLSelectElement)(id).addEventListener("input",update));
+["entry","quantity","leverage","maintenance","starting-margin","shock","funding-rate","funding-periods","market"].forEach(id=>$<HTMLInputElement | HTMLSelectElement>(id).addEventListener("input",update));
 $("funding-toggle").addEventListener("change",()=>{const enabled=$("funding-toggle").checked; $("funding-fields").setAttribute("aria-disabled",String(!enabled));$("funding-rate").disabled=!enabled;$("funding-periods").disabled=!enabled;update();});
 $("run-scenario").addEventListener("click",markRun);
 $("export-json").addEventListener("click",download);
