@@ -94,7 +94,7 @@ async function loadMarkets(){
   const raw=Array.isArray(payload)?payload:[root.markets,root.data,root.result].find(Array.isArray);
   if(!Array.isArray(raw)||raw.length===0)throw new Error("No market rows returned by the API.");
   markets=raw.filter((m):m is MarketRecord=>!!m&&typeof m==="object") as MarketRecord[];
-  const select=$("market");const previous=select.value;
+  const select=$<HTMLSelectElement>("market");const previous=select.value;
   select.replaceChildren();
   for(const m of markets){const symbol=String(m.symbol??m.name??m.baseSymbol??"");if(!symbol)continue;const opt=document.createElement("option");opt.value=symbol;opt.textContent=symbol;select.append(opt);}
   if(!select.options.length)throw new Error("The response did not contain readable market symbols.");
