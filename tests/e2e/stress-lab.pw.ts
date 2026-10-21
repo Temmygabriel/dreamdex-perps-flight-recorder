@@ -125,10 +125,14 @@ test("keeps the mobile UI spaced and free of leaked glyphs", async ({ page }) =>
       const rect = el.getBoundingClientRect();
       return { left: rect.left, top: rect.top, width: rect.width };
     }),
+    overflowers: Array.from(document.querySelectorAll("body *")).map((el) => {
+      const rect = el.getBoundingClientRect();
+      return { tag: el.tagName, id: el.id, cls: typeof el.className === "string" ? el.className : "", left: Math.round(rect.left), right: Math.round(rect.right), width: Math.round(rect.width), scrollWidth: (el as HTMLElement).scrollWidth };
+    }).filter((el) => el.right > document.documentElement.clientWidth + 1 || el.left < -1).slice(0, 18),
   }));
+  console.log("MOBILE_LAYOUT_DIAGNOSTIC", JSON.stringify(dimensions));
   expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
   expect(dimensions.nav).not.toBe("none");
-  console.log("MOBILE_LAYOUT_DIAGNOSTIC", JSON.stringify(dimensions));
   expect(dimensions.cardRects).toHaveLength(4);
   expect(dimensions.cardRects[0].left).not.toBe(dimensions.cardRects[1].left);
   expect(dimensions.cardRects[0].top).toBe(dimensions.cardRects[1].top);
