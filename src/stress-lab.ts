@@ -1,3 +1,4 @@
+import { calculateStress } from "./stress-model.js";
 type Side = "long" | "short";
 type MarketRecord = { symbol?: string; name?: string; baseSymbol?: string; quoteSymbol?: string; markPrice?: number|string; mark?: number|string; price?: number|string; minQuantity?: number|string; minSize?: number|string; tickSize?: number|string; lotSize?: number|string; maintenanceMarginRate?: number|string; maintenanceMargin?: number|string; [key:string]: unknown };
 type Scenario = { createdAt:string; product:"Perps Stress Lab"; version:"0.1.0"; network:{name:string;chainId:number}; source:"manual-input"; side:Side; market:string; entryPrice:number; quantity:number; leverage:number; startingMarginPercent:number; startingMarginUsd:number; shockPercent:number; stressedPrice:number; pnlUsd:number; funding:{enabled:boolean;rate8hPercent:number;periods:number;estimatedUsd:number;assumption:string}; equityUsd:number; maintenancePercent:number; maintenanceUsd:number; headroomUsd:number; thresholdStatus:"above-estimate"|"at-or-below-estimate"; assumptions:string[] };
@@ -22,16 +23,12 @@ function readInputs(){
 }
 function compute(){
   const x=readInputs();
-  const stressed=x.entry*(1+x.shock/100);
-  const direction=side==="long"?1:-1;
-  const pnl=x.quantity*(stressed-x.entry)*direction;
-  const startingMargin=x.quantity*x.entry*x.marginPercent/100;
-  // A positive 8h rate means longs pay shorts. This simple assumption uses full 8h periods.
-  const fundingUsd=x.fundingEnabled ? -direction*x.quantity*x.entry*(x.fundingRate/100)*x.periods : 0;
-  const equity=startingMargin+pnl+fundingUsd;
-  const maintenance=x.quantity*stressed*x.maintenance/100;
-  const headroom=equity-maintenance;
   const market=val("market");
+  const calculated=calculateStress({
+    side, entryPrice:x.entry, quantity:x.quantity, startingMarginPercent:x.marginPercent,
+    shockPercent:x.shock, maintenancePercent:x.maintenance,
+    fundingEnabled:x.fundingEnabled, fundingRate8hPercent:x.fundingRate, fundingPeriods:x.periods
+  });
   const assumptions=[
     "One isolated position only; no cross-margin offsets or other positions.",
     "Estimated equity = starting margin + directional unrealised P&L + optional simplified funding estimate.",
@@ -40,7 +37,7 @@ function compute(){
     "Funding uses the entry notional, a constant user-entered 8h rate and full 8h periods; it is not a forecast of future rates.",
     "This result is not an official dreamDEX liquidation price or liquidation status."
   ];
-  return {createdAt:new Date().toISOString(),product:"Perps Stress Lab",version:"0.1.0",network:{name:"Somnia Hideki Testnet",chainId:50383},source:"manual-input",side,market,entryPrice:x.entry,quantity:x.quantity,leverage:100/x.marginPercent,startingMarginPercent:x.marginPercent,startingMarginUsd:startingMargin,shockPercent:x.shock,stressedPrice:stressed,pnlUsd:pnl,funding:{enabled:x.fundingEnabled,rate8hPercent:x.fundingRate,periods:x.periods,estimatedUsd:fundingUsd,assumption:x.fundingEnabled?"Constant rate over full 8h periods; calculated on entry notional.":"Funding excluded."},equityUsd:equity,maintenancePercent:x.maintenance,maintenanceUsd:maintenance,headroomUsd:headroom,thresholdStatus:headroom>0?"above-estimate":"at-or-below-estimate",assumptions} satisfies Scenario;
+  return {createdAt:new Date().toISOString(),product:"Perps Stress Lab",version:"0.1.0",network:{name:"Somnia Hideki Testnet",chainId:50383},source:"manual-input",side,market,entryPrice:x.entry,quantity:x.quantity,leverage:calculated.leverage,startingMarginPercent:x.marginPercent,startingMarginUsd:calculated.startingMarginUsd,shockPercent:x.shock,stressedPrice:calculated.stressedPrice,pnlUsd:calculated.pnlUsd,funding:{enabled:x.fundingEnabled,rate8hPercent:x.fundingRate,periods:x.periods,estimatedUsd:calculated.fundingUsd,assumption:x.fundingEnabled?"Constant rate over full 8h periods; calculated on entry notional.":"Funding excluded."},equityUsd:calculated.equityUsd,maintenancePercent:x.maintenance,maintenanceUsd:calculated.maintenanceUsd,headroomUsd:calculated.headroomUsd,thresholdStatus:calculated.thresholdStatus,assumptions} satisfies Scenario;
 }
 function update(){
  try{
@@ -101,7 +98,7 @@ async function loadMarkets(){
   if([...select.options].some(o=>o.value===previous))select.value=previous;
   const selected=markets.find(m=>String(m.symbol??m.name??m.baseSymbol??"")===select.value);
   const price=Number(selected?.markPrice??selected?.mark??selected?.price);
-  if(Number.isFinite(price)&&price>0){$("entry").value=String(price);setText("market-hint","Read-only market endpoint returned a price. Confirm its source and freshness before using it.");}
+  if(Number.isFinite(price)&&price>0){$<HTMLInputElement>("entry").value=String(price);setText("market-hint","Read-only market endpoint returned a price. Confirm its source and freshness before using it.");}
   else setText("market-hint","Market list loaded. No recognised price field; entry price remains a manual input.");
   status.innerHTML='<span class="status-dot"></span> Market list loaded';
   setText("method-data","Read-only /api/markets responded with "+markets.length+" market rows. The stress formula still uses manual inputs and does not claim to read live account margin.");
