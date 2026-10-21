@@ -54,6 +54,15 @@ jobs:
           npm ci --no-audit --no-fund
           npm ls --all
 
+      - name: Preserve generated lockfile for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-lockfile-review
+          path: package-lock.json
+          if-no-files-found: warn
+          retention-days: 7
+
   checks:
     name: Typecheck and deterministic tests
     runs-on: ubuntu-latest
