@@ -132,6 +132,36 @@ async function loadMarkets(){
  }
  update();
 }
+
+type ThemeMode = "light" | "dim";
+const THEME_STORAGE_KEY = "perps-stress-lab-theme";
+
+function applyTheme(mode: ThemeMode, persist = false): void {
+  document.documentElement.dataset.theme = mode;
+  const dim = mode === "dim";
+  const button = $<HTMLButtonElement>("theme-toggle");
+  button.setAttribute("aria-pressed", String(dim));
+  button.setAttribute("aria-label", dim ? "Switch to light mode" : "Switch to dim mode");
+  button.title = dim ? "Switch to light mode" : "Switch to dim mode";
+  setText("theme-toggle-label", dim ? "Light mode" : "Dim mode");
+  setText("theme-toggle-icon", dim ? "☼" : "◐");
+  const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (themeColor) themeColor.content = dim ? "#14191f" : "#eef2f7";
+  if (persist) {
+    try { localStorage.setItem(THEME_STORAGE_KEY, mode); } catch { /* Theme still applies for this page. */ }
+  }
+}
+
+let initialTheme: ThemeMode = "light";
+try {
+  if (localStorage.getItem(THEME_STORAGE_KEY) === "dim") initialTheme = "dim";
+} catch { /* Storage can be unavailable in private browsing. */ }
+applyTheme(initialTheme);
+$("theme-toggle").addEventListener("click", () => {
+  const next: ThemeMode = document.documentElement.dataset.theme === "dim" ? "light" : "dim";
+  applyTheme(next, true);
+});
+
 document.querySelectorAll<HTMLButtonElement>("[data-side]").forEach(b=>b.addEventListener("click",()=>{lastRunAt=null;side=b.dataset.side as Side;document.querySelectorAll("[data-side]").forEach(x=>x.classList.toggle("active",x===b));update();}));
 document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.addEventListener("click",()=>{lastRunAt=null; $<HTMLInputElement>("shock").value=b.dataset.shock!;update();}));
 ["entry","quantity","maintenance","starting-margin","shock","funding-rate","funding-periods","market"].forEach(id=>$<HTMLInputElement | HTMLSelectElement>(id).addEventListener("input",()=>{lastRunAt=null;if(id==="starting-margin"){const percent=num("starting-margin");const leverage=$<HTMLSelectElement>("leverage");const choices=[2,5,10,20];leverage.value=String(choices.reduce((best,current)=>Math.abs(100/current-percent)<Math.abs(100/best-percent)?current:best,choices[0]));}if(id==="entry"){entryPriceSource="manual-input";priceReference={source:"manual input",timestamp:null,bestBid:null,bestAsk:null};}update();if(id==="market")void loadMarketPrice(val("market"));}));
