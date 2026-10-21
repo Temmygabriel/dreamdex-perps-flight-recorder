@@ -1,0 +1,40 @@
+name: One-time authorized Perps Stress Lab testnet order
+on:
+  push:
+    branches:
+      - ops/run-order-smoke-once
+permissions:
+  contents: read
+concurrency:
+  group: perps-stress-lab-one-time-order-smoke
+  cancel-in-progress: false
+jobs:
+  testnet-order:
+    if: github.event.head_commit.message == 'RUN ONE AUTHORIZED TESTNET ORDER LIFECYCLE'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install packages without secrets in the environment
+        run: npm install --no-audit --no-fund
+      - name: Typecheck project
+        run: npm run typecheck
+      - name: Run one bounded Hideki testnet order lifecycle
+        env:
+          WALLET_KEY: ${{ secrets.wallet_key }}
+          CONFIRM_LIVE_TEST_ORDER: YES
+          SMOKE_SIDE: long
+        run: npm run testnet:order-smoke
+      - name: Upload redacted testnet evidence receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perps-stress-lab-one-time-order-receipt
+          path: artifacts/perps-stress-lab-order-smoke.json
+          if-no-files-found: warn
+          retention-days: 30
