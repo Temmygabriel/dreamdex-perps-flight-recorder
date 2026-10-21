@@ -33,12 +33,12 @@ jobs:
       - name: Production frontend build
         run: npm run build
 
-      - name: Test pure order checks
+      - name: Test deterministic scenario model
         run: npm test
 
   testnet-read-only:
     name: Optional read-only testnet check
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'rebuild/perps-stress-lab')
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -55,9 +55,6 @@ jobs:
 
       - name: Install packages
         run: npm install --no-audit --no-fund
-
-      - name: Read-only SDK preflight
-        run: npm run preflight
 
       - name: Check market minimums against live books (read-only)
         run: npx tsx scripts/inspect-market-minimums.ts
