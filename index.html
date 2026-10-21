@@ -65,6 +65,30 @@
         </div>
         <p class="section-intro">Start read-only. A pass or block can be saved as a diagnostic file for review or a potential Feedback report. No transaction is sent by this check.</p>
 
+        <section class="session-plan" aria-labelledby="session-plan-title">
+          <div class="session-plan-heading">
+            <div><p class="eyebrow">SESSION SETUP</p><h3 id="session-plan-title">What are you testing?</h3></div>
+            <span class="panel-tag">SAVED ON THIS DEVICE</span>
+          </div>
+          <label for="session-thesis">Your trade thesis <span>REQUIRED · ONE SENTENCE</span></label>
+          <input id="session-thesis" maxlength="240" autocomplete="off" placeholder="e.g. I am testing whether a small BTC limit order rests without crossing the book" required>
+          <div class="field-row">
+            <div>
+              <label for="session-budget">Maximum order value <span>PAPER USDSO</span></label>
+              <select id="session-budget">
+                <option value="5">5 USDso · smallest test</option>
+                <option value="10" selected>10 USDso · standard test</option>
+                <option value="25">25 USDso · hard maximum</option>
+              </select>
+            </div>
+            <div class="plan-status">
+              <span class="readout-label">SESSION RULE</span>
+              <strong>Never above your chosen budget</strong>
+            </div>
+          </div>
+          <p class="session-plan-note">The budget limits the order's estimated notional value; it is not a guarantee of maximum loss or a substitute for margin checks. Session notes stay in this browser unless you export them.</p>
+        </section>
+
         <form id="preflight-form">
           <label for="account-address">Your testnet trading wallet <span>PUBLIC ADDRESS</span></label>
           <input id="account-address" name="accountAddress" autocomplete="off" spellcheck="false" placeholder="Connect wallet to fill this automatically" required>
