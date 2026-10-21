@@ -135,6 +135,9 @@ async function main(): Promise<void> {
       String(row.quote ?? row.info?.quoteSymbol ?? "").toUpperCase() === String(market.quoteSymbol).toUpperCase()
     ) as any;
     if (!sdkMarket?.symbol) throw new Error("The SDK did not resolve BTC Perps to a readable order book.");
+    // Use the SDK-resolved symbol for order read-back. The raw market row may
+    // not share the exchange adapter unified symbol format.
+    marketSymbol = String(sdkMarket.symbol);
 
     const book = await exchange.fetchOrderBook(sdkMarket.symbol, 1);
     const top = Number(isBid ? book.bids?.[0]?.[0] : book.asks?.[0]?.[0]);
