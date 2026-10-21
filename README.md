@@ -14,6 +14,7 @@ Perps Stress Lab is a scenario explorer for dreamDEX Perps on Somnia Hideki test
 - Editable starting margin and maintenance assumptions.
 - Optional, explicitly simplified constant-rate funding scenario.
 - Deterministic formula trace for stressed price, directional P&L, estimated equity, and estimated maintenance.
+- Extracted pure calculation model with automated tests for long/short P&L, funding signs, zero-shock behavior, and invalid inputs.
 - JSON export with inputs, outputs, assumptions, chain context and explicit `onChain: false` / `liveAccountDataUsed: false` verification flags.
 - Read-only attempt to load market list from `/api/markets`; if unavailable, the user can still run a manual scenario and the UI must say market data is unavailable.
 
@@ -42,7 +43,7 @@ Optional funding is a deliberately simplified scenario: positive 8-hour rate mea
 
 **The current branch is an implementation in progress.** Do not describe it as fully verified against Hideki until the following have been demonstrated:
 
-- [ ] GitHub Actions typecheck, unit tests and production build pass.
+- [ ] GitHub Actions typecheck, unit tests and production build pass (latest code must be green).
 - [ ] Market-list request returns a documented live Hideki response; fields and freshness are correctly understood.
 - [ ] Formula tests independently validate long and short cases, shock direction, funding signs and threshold edge cases.
 - [ ] Any account-aware mode is implemented only if the SDK exposes the required Perps account data and it is validated against the protocol.
