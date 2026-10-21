@@ -1,50 +1,47 @@
-# Build plan
+# Perps Practice Desk build plan
 
-The bounty submission closes on 1 November 2026 at 23:59 UTC. We need one proven path before UI polish.
+The bounty submission closes on 1 November 2026 at 23:59 UTC. The goal is one understandable product workflow with real, reproducible testnet evidence—not a broad trading terminal.
 
-## Gate 0 — project setup (started)
+## Product contract
 
-- [x] Public repository created.
-- [x] Official SDK pinned to version 0.32.1, matching the current developer guide.
-- [x] TypeScript check and deterministic order-rule tests added.
-- [x] GitHub Actions installed without any private keys.
-- [x] Read-only testnet diagnostic added.
-- [ ] Confirm the first read-only SDK call succeeds against Hideki.
-- [ ] Add and commit a lockfile after dependency resolution is stable.
+Perps Practice Desk guides a user through: plan a test → choose an order-value budget → inspect live market/account constraints → place a post-only testnet order with explicit wallet approval → cancel it → verify read-back → keep a session journal.
 
-## Gate 1 — account and API forensics
+## Implemented in this pivot branch
 
-- [ ] Discover live market rows, their current decimal precision, min quantity, lot size and tick size.
-- [ ] Test read-only SDK calls and save the SDK version/network in each report.
-- [ ] Test public market-data and account-query behaviors where possible.
-- [ ] Compare the official SDK example with actual behavior.
-- [ ] Record candidate issues privately in notes first; do not publish a report until the issue is reproduced and duplicate risk has been checked.
-- [ ] Security vulnerabilities must be sent privately to security@dreamdex.io.
+- [x] Reframed the app from a developer debugging workbench into a guided practice session.
+- [x] Added required trade-thesis input.
+- [x] Added selectable order-value caps: 5, 10, or 25 paper USDso.
+- [x] Enforced the selected cap when presenting preflight results and again immediately before a wallet transaction.
+- [x] Added a browser-local journal with pending / verified / incomplete states and JSON export.
+- [x] Added session thesis and budget to the order evidence receipt.
+- [x] Kept the existing read-only market reads, account-aware SDK preflight, post-only order, explicit cancellation, and read-back verification.
+- [x] Kept the existing warning not to bypass wallet phishing/security alerts.
 
-## Gate 2 — safest real testnet order
+## Not yet proven
 
-- [ ] Use a dedicated testnet bot key, never an everyday wallet key.
-- [ ] Confirm the correct account, testnet chain ID 50383, gas balance, and paper collateral.
-- [ ] Query the market's current rules and live price.
-- [ ] Call the SDK order-size preflight and reject stale prices, voucher-blocked markets, insufficient margin, or invalid sizes.
-- [ ] Show the full order details before the user explicitly approves.
-- [ ] Submit a small testnet order.
-- [ ] Save the transaction hash and receipt.
-- [ ] Read the order/position/fill state again; a transaction receipt alone is not enough to prove the intended trade happened.
-- [ ] Cancel a resting order or close the position and verify the final state.
+- [ ] GitHub Actions typecheck, deterministic tests, and production build pass for this branch.
+- [ ] Confirm the local journal behaves correctly in a real browser, including browser storage being unavailable.
+- [ ] Confirm the session budget blocks an oversized order in a browser test.
+- [ ] Complete a real order/cancel/read-back test on Hideki testnet with the user's explicit wallet approval.
+- [ ] Verify the deployed Vercel URL serves the new branch after merge/deployment.
+- [ ] Capture a judge-ready 60-second demo with actual, redacted evidence.
+- [ ] Publish 2–3 real X posts tagging `@DreamDEXSomnia` and add their links.
+- [ ] Confirm DoraHacks whitelist status before attempting submission.
 
-## Gate 3 — product UI
+## Safety and truthfulness gates
 
-- [ ] Show market, side, price, quantity, size limits, margin/gas checks and a plain-English result.
-- [ ] Separate "preflight passed" from "order submitted" and "result independently verified".
-- [ ] Export an evidence receipt as JSON and Markdown.
-- [ ] Make failure reasons useful and never display fake green success states.
-- [ ] Mobile and desktop layout; premium but product-specific design.
+- Chain: Somnia Hideki / Tokyo testnet, chain ID `50383`.
+- The app does not need a private key or mainnet funds.
+- The chosen budget caps estimated order notional only. It does not guarantee maximum loss, prevent all fills, or replace Perps margin/liquidation rules.
+- A transaction receipt alone is not enough. Only report a verified lifecycle when the order was observed after placement, cancellation succeeded, and read-back confirmed it absent.
+- If a wallet displays a phishing/drainer warning, stop and seek an official wallet security review. Never bypass the warning to demo the app.
+- No real trade or bounty acceptance should be claimed until evidence exists.
 
-## Gate 4 — final submission
+## Final submission
 
-- [ ] Re-run CI.
-- [ ] Capture evidence from the canonical live testnet run.
-- [ ] Ensure README explains product, user, setup, architecture, known limits and reproduction.
-- [ ] Add 2–3 X post links that mention @DreamDEXSomnia, as required by the bounty.
-- [ ] Publish the DoraHacks Build only after the email is confirmed whitelisted.
+- [ ] CI green.
+- [ ] README describes the user, core loop, architecture, setup, limits, and proof accurately.
+- [ ] Live app and mobile layout checked.
+- [ ] Evidence receipt and journal export reviewed for sensitive data.
+- [ ] 2–3 X post links added to README.
+- [ ] DoraHacks submission checked against the current bounty rules.
