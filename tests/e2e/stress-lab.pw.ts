@@ -94,3 +94,26 @@ test("keeps the mobile viewport free of horizontal page overflow", async ({ page
   }));
   expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
 });
+
+
+test("keeps the mobile UI spaced and free of leaked glyphs", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await expect(page.locator(".nav-list")).toBeVisible();
+  await expect(page.getByText("Include funding", { exact: true })).toBeVisible();
+  await expect(page.locator(".metric-card")).toHaveCount(4);
+  await expect(page.locator(".metric-icon")).toHaveCount(0);
+  await expect(page.locator(".file-icon")).toHaveText("JSON");
+  await expect(page.locator(".evidence-tags span")).toHaveCount(3);
+  await expect(page.locator(".method-grid article > span")).toHaveCount(0);
+  await expect(page.getByText('{"}', { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Build a position. Apply pressure.", { exact: true })).toHaveCount(0);
+  const dimensions = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    content: document.documentElement.scrollWidth,
+    nav: getComputedStyle(document.querySelector(".nav-list")!).display,
+    cards: getComputedStyle(document.querySelector(".metric-grid")!).gridTemplateColumns,
+  }));
+  expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
+  expect(dimensions.nav).not.toBe("none");
+  expect(dimensions.cards.split(" ").length).toBe(2);
+});
