@@ -1,4 +1,4 @@
-import "../app.css";
+import "./app.css";
 import { calculateStress } from "./stress-model.js";
 type Side = "long" | "short";
 type MarketRecord = { symbol?: string; name?: string; baseSymbol?: string; quoteSymbol?: string; markPrice?: number|string; mark?: number|string; price?: number|string; minQuantity?: number|string; minSize?: number|string; tickSize?: number|string; lotSize?: number|string; maintenanceMarginRate?: number|string; maintenanceMargin?: number|string; [key:string]: unknown };
