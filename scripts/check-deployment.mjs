@@ -26,7 +26,7 @@ async function getJson(path) {
 async function main() {
   let marketsPayload;
   let lastError;
-  for (let attempt = 1; attempt <= 8; attempt++) {
+  for (let attempt = 1; attempt <= 18; attempt++) {
     try {
       marketsPayload = await getJson("/api/markets");
       break;
@@ -35,7 +35,7 @@ async function main() {
       if (error?.status === 401 || error?.status === 403) {
         throw new Error("Preview deployment is access-protected; public smoke test cannot reach it.");
       }
-      if (attempt < 8) await wait(5_000);
+      if (attempt < 18) await wait(5_000);
     }
   }
   if (!marketsPayload) throw new Error(`Market endpoint never became ready: ${lastError?.message ?? "unknown error"}`);
@@ -48,7 +48,7 @@ async function main() {
   const symbol = String(market.symbol ?? `${market.baseSymbol}-${market.quoteSymbol}`);
   let pricePayload;
   lastError = undefined;
-  for (let attempt = 1; attempt <= 8; attempt++) {
+  for (let attempt = 1; attempt <= 18; attempt++) {
     try {
       pricePayload = await getJson("/api/market-price?symbol=" + encodeURIComponent(symbol));
       break;
@@ -57,7 +57,7 @@ async function main() {
       if (error?.status === 401 || error?.status === 403) {
         throw new Error("Preview deployment is access-protected; public smoke test cannot reach it.");
       }
-      if (attempt < 8) await wait(5_000);
+      if (attempt < 18) await wait(5_000);
     }
   }
   if (!pricePayload) throw new Error(`Order-book endpoint never became ready: ${lastError?.message ?? "unknown error"}`);

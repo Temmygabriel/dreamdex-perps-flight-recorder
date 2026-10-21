@@ -51,7 +51,7 @@ Optional funding is a deliberately simplified scenario: positive 8-hour rate mea
 - [ ] A manual, explicitly confirmed testnet order workflow is implemented with a hard 10–15 USDso notional cap, POST_ONLY order, cancellation, and a key-rotation safety stop. It has **not** been executed yet; order receipt, read-back and cleanup remain unverified.
 - [ ] Public Vercel deployment is tested on desktop and mobile.
 - [x] Playwright browser smoke tests cover live-price prefill, long/short P&L direction, honest JSON export flags, and mobile overflow against mocked API responses.
-- [ ] Deployed preview smoke check confirms the Vercel serverless endpoints are live and returning fresh Hideki data. The preview is currently access-protected; the check reports a skip unless `VERCEL_AUTOMATION_BYPASS_SECRET` is configured in GitHub Actions.
+- [ ] Deployed preview smoke check confirms the Vercel serverless endpoints are live and returning fresh Hideki data. The preview is currently access-protected; the preview check reports a skip unless `VERCEL_AUTOMATION_BYPASS_SECRET` is configured in GitHub Actions. A separate read-only check now also runs against the production URL after pushes to main.
 
 A successful market read does not validate the stress model. A successful order does not prove liquidation accuracy. The model must not claim protocol-accurate liquidation prediction without independently validated account-equity rules, fees, funding, cross-margin interactions and liquidation-engine behaviour.
 
