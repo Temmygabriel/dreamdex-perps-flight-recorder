@@ -46,7 +46,8 @@ Optional funding is a deliberately simplified scenario: positive 8-hour rate mea
 - [ ] GitHub Actions typecheck, unit tests and production build pass (latest code must be green).
 - [ ] Live market-list and order-book midpoint endpoints are verified in the deployed Vercel preview; the midpoint is not the protocol mark price.
 - [ ] Formula tests independently validate long and short cases, shock direction, funding signs and threshold edge cases.
-- [ ] Any account-aware mode is implemented only if the SDK exposes the required Perps account data and it is validated against the protocol.
+- [x] CI performs a read-only Perps account readiness check: voucher eligibility and SDK max-order-size gate, without signing or sending a transaction.
+- [ ] Any account-aware stress mode is implemented only after the SDK exposes the required Perps account data and it is validated against the protocol.
 - [ ] If a separate testnet order flow is ever added, the user explicitly approves the transaction and the app verifies transaction receipt, read-back and cleanup.
 - [ ] Public Vercel deployment is tested on desktop and mobile.
 - [x] Playwright browser smoke tests cover live-price prefill, long/short P&L direction, honest JSON export flags, and mobile overflow against mocked API responses.

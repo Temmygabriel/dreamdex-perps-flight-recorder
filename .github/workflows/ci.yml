@@ -84,6 +84,11 @@ jobs:
           WALLET_KEY: ${{ secrets.wallet_key }}
         run: npm run check:wallet
 
+      - name: Read Perps voucher eligibility and maximum order-size gate (no transaction)
+        env:
+          WALLET_KEY: ${{ secrets.wallet_key }}
+        run: npm run check:perps-readiness
+
   deployed-preview-read-only:
     name: Deployed preview market and price smoke check
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'rebuild/perps-stress-lab'
