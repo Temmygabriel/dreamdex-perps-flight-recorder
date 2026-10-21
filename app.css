@@ -309,3 +309,7 @@ footer{border-color:#dbe3ec;color:#718096;font-size:9px;line-height:1.8}
  .trace-num{width:21px;height:21px}
  .trace-list li>b{max-width:75px;font-size:9px}
 }
+
+/* Override the legacy dark metric-card declarations with the light UI. */
+.stress-panel .metric-grid{border-top-color:#e0e6ee}
+.stress-panel .metric-card{background:#fbfcfe;border-color:#e0e6ee;box-shadow:none}
