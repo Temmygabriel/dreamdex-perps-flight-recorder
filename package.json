@@ -1,9 +1,9 @@
 {
-  "name": "dreamdex-perps-flight-recorder",
+  "name": "perps-stress-lab",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Testnet-first order preflight and execution evidence for dreamDEX perpetuals.",
+  "description": "Transparent position stress scenarios for dreamDEX Perps on Somnia Hideki testnet.",
   "scripts": {
     "preflight": "tsx src/preflight.ts",
     "test": "vitest run",
