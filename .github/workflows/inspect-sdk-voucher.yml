@@ -18,6 +18,17 @@ jobs:
       - run: npm install --no-audit --no-fund
       - name: Print voucher method implementation and relevant SDK files (no wallet secret)
         run: |
+          sed -n '180,310p' node_modules/@somnia-chain/markets-sdk/dist/tradeAbi.js
+          grep -R -n -E "error [A-Za-z_][A-Za-z0-9_]*\(" node_modules/@somnia-chain/markets-sdk/dist --include='*.js' | head -150
+          node --input-type=module - <<'NODE'
+          import { toFunctionSelector } from "viem";
+          const names = ["ClaimantNotFlat","ClaimantIsMainFunded","AlreadyClaimed","CampaignInactive","InsufficientBudget","BudgetExhausted","NotFlat","NotEligible","VoucherNotEligible","InvalidClaim","ClaimDisabled","ClaimPaused","Unauthorized","ReentrancyGuardReentrantCall","PausableEnforcedPause","TransferFailed","SafeERC20FailedOperation","OwnableUnauthorizedAccount","InvalidAccount","NoCredit","InsufficientBalance"];
+          for (const name of names) {
+            for (const sig of [name+"()", name+"(address)", name+"(uint256)"]) {
+              if (toFunctionSelector(sig).toLowerCase() === "0x3e31dcc2") console.log("MATCH", sig);
+            }
+          }
+          NODE
           sed -n '1,220p' node_modules/@somnia-chain/markets-sdk/dist/perp/voucher.js
           sed -n '1,160p' node_modules/@somnia-chain/markets-sdk/dist/perp/voucher.d.ts
           sed -n '1090,1135p' node_modules/@somnia-chain/markets-sdk/dist/trade.d.ts
