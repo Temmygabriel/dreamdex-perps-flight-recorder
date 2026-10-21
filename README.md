@@ -13,10 +13,10 @@ Perps Stress Lab is a scenario explorer for dreamDEX Perps on Somnia Hideki test
 - Adjustable price shock from −50% to +50%.
 - Editable starting margin and maintenance assumptions.
 - Optional, explicitly simplified constant-rate funding scenario.
-- Deterministic formula trace for stressed price, directional P&L, estimated equity, and estimated maintenance.
+- Deterministic formula trace for stressed price, directional P&L, estimated equity, and estimated maintenance. Monetary figures are quote-unit estimates (USDso-equivalent), not withdrawable cash or guaranteed execution prices.
 - Extracted pure calculation model with automated tests for long/short P&L, funding signs, zero-shock behavior, and invalid inputs.
 - JSON export with inputs, outputs, assumptions, chain context and explicit `onChain: false` / `liveAccountDataUsed: false` verification flags.
-- Read-only attempt to load market list from `/api/markets`; if unavailable, the user can still run a manual scenario and the UI must say market data is unavailable.
+- Reads live Hideki market definitions through `/api/markets` and requests the selected market’s top-of-book bid/ask midpoint through `/api/market-price`. The midpoint is explicitly **not** represented as the protocol mark price. If either endpoint is unavailable, manual scenarios remain available.
 
 ## Calculation model
 
@@ -44,7 +44,7 @@ Optional funding is a deliberately simplified scenario: positive 8-hour rate mea
 **The current branch is an implementation in progress.** Do not describe it as fully verified against Hideki until the following have been demonstrated:
 
 - [ ] GitHub Actions typecheck, unit tests and production build pass (latest code must be green).
-- [ ] Market-list request returns a documented live Hideki response; fields and freshness are correctly understood.
+- [ ] Live market-list and order-book midpoint endpoints are verified in the deployed Vercel preview; the midpoint is not the protocol mark price.
 - [ ] Formula tests independently validate long and short cases, shock direction, funding signs and threshold edge cases.
 - [ ] Any account-aware mode is implemented only if the SDK exposes the required Perps account data and it is validated against the protocol.
 - [ ] If a separate testnet order flow is ever added, the user explicitly approves the transaction and the app verifies transaction receipt, read-back and cleanup.
