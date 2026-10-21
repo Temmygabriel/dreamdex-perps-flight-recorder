@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - ops/run-perps-e2e-once
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -15,7 +18,7 @@ concurrency:
 
 jobs:
   funded-perps-e2e:
-    if: contains(github.event.head_commit.message, '[RUN_PERPS_E2E_ONE_SHOT]')
+    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[RUN_PERPS_E2E_ONE_SHOT]')) || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'ops/run-perps-e2e-once' && contains(github.event.pull_request.title, '[RUN_PERPS_E2E_ONE_SHOT]'))
     name: Use existing wallet collateral, place and cancel capped BTC order
     runs-on: ubuntu-latest
     timeout-minutes: 15
