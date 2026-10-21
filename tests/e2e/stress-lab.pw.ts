@@ -38,11 +38,22 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/");
 });
 
+test("starts with internally consistent default calculations and live-preview wording", async ({ page }) => {
+  await expect(page.locator("#scenario-status")).toHaveText("LIVE PREVIEW");
+  await expect(page.locator("#result-price")).toHaveText("$90,000.00");
+  await expect(page.locator("#result-pnl")).toHaveText("−$100.00");
+  await expect(page.locator("#result-equity")).toHaveText("$0.00");
+  await expect(page.locator("#result-headroom")).toHaveText("−$22.50");
+  await expect(page.locator("#trace-equity-value")).toHaveText("$0.00");
+});
+
 test("prefills the selected market from a labelled read-only book midpoint", async ({ page }) => {
   await expect(page.locator("#market-hint")).toContainText("Live book midpoint");
   await expect(page.locator("#entry")).toHaveValue("100000");
   await expect(page.locator("#market-hint")).toContainText("not a mark price");
   await expect(page.locator("#data-status")).toContainText("Market list loaded");
+  await page.locator("#run-scenario").click();
+  await expect(page.locator("#scenario-status")).toHaveText("SCENARIO REVIEWED");
 });
 
 test("direction and price shock change the estimated P&L in opposite ways", async ({ page }) => {

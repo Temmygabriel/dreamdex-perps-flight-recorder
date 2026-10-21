@@ -61,7 +61,8 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   } catch (error) {
     res.status(502).json({
       ok: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: "Market data is temporarily unavailable. Please retry shortly.",
+      errorType: error instanceof Error ? error.name : "UnknownError",
       network: { name: "Somnia Hideki / dreamDEX Tokyo testnet", chainId: 50383 },
     });
   } finally {

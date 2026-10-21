@@ -14,7 +14,7 @@ Perps Stress Lab is a scenario explorer for dreamDEX Perps on Somnia Hideki test
 - Editable starting margin and maintenance assumptions.
 - Optional, explicitly simplified constant-rate funding scenario.
 - Deterministic formula trace for stressed price, directional P&L, estimated equity, and estimated maintenance. Monetary figures are quote-unit estimates (USDso-equivalent), not withdrawable cash or guaranteed execution prices.
-- Extracted pure calculation model with automated tests for long/short P&L, funding signs, zero-shock behavior, and invalid inputs.
+- Extracted pure calculation model with tests for long/short symmetry, linear quantity scaling, funding signs, zero and total-loss shocks, headroom invariants, invalid inputs, and arithmetic overflow.
 - JSON export with inputs, outputs, assumptions, chain context and explicit `onChain: false` / `liveAccountDataUsed: false` verification flags.
 - Reads live Hideki market definitions through `/api/markets` and requests the selected market’s top-of-book bid/ask midpoint through `/api/market-price`. The midpoint is explicitly **not** represented as the protocol mark price. If either endpoint is unavailable, manual scenarios remain available.
 
@@ -45,10 +45,10 @@ Optional funding is a deliberately simplified scenario: positive 8-hour rate mea
 
 - [x] GitHub Actions typecheck, unit tests and production build pass on the latest tested revision.
 - [ ] Live market-list and order-book midpoint endpoints are verified in the deployed Vercel preview; the midpoint is not the protocol mark price.
-- [x] Formula tests validate long and short cases, shock direction, funding signs and invalid-input boundaries.
+- [x] Formula tests validate long/short symmetry, funding direction, quantity scaling, total-loss shock, headroom invariants, invalid inputs, and overflow protection.
 - [x] CI performs a read-only Perps account readiness check: voucher eligibility and SDK max-order-size gate, without signing or sending a transaction.
 - [ ] Any account-aware stress mode is implemented only after the SDK exposes the required Perps account data and it is validated against the protocol.
-- [ ] A manual, explicitly confirmed testnet order workflow is implemented with a hard 10–15 USDso notional cap, POST_ONLY order, cancellation, and a key-rotation safety stop. It has **not** been executed yet; order receipt, read-back and cleanup remain unverified.
+- [x] A manual, explicitly confirmed testnet order workflow is implemented with a hard 10–15 USDso notional cap, POST_ONLY order, cancellation, read-back and zero-fill checks. It has **not** been executed yet; order receipt, read-back and cleanup remain unverified.
 - [ ] Public Vercel deployment is tested on desktop and mobile.
 - [x] Playwright browser smoke tests cover live-price prefill, long/short P&L direction, honest JSON export flags, and mobile overflow against mocked API responses.
 - [ ] Deployed preview smoke check confirms the Vercel serverless endpoints are live and returning fresh Hideki data. The preview is currently access-protected; the preview check reports a skip unless `VERCEL_AUTOMATION_BYPASS_SECRET` is configured in GitHub Actions. A separate read-only check now also runs against the production URL after pushes to main.
@@ -60,14 +60,14 @@ A successful market read does not validate the stress model. A successful order 
 The repository includes [a manual GitHub Actions workflow](.github/workflows/testnet-order-smoke.yml) that can claim the paper-USDso voucher if eligible, then place one capped POST_ONLY BTC order and cancel it. It is deliberately not triggered by pushes or pull requests.
 
 Before running it:
-1. Replace the existing `wallet_key` Actions secret with a **fresh, dedicated testnet-only key**. The workflow refuses the previously tested address.
+1. Confirm `wallet_key` contains a wallet funded for Hideki testnet only. The secret is injected only into the transaction step; it is never printed or uploaded.
 2. Ensure the new wallet has Hideki testnet STT for gas.
 3. After this branch is merged, open Actions → **Perps Stress Lab testnet order smoke** → Run workflow. Select `YES` only when authorizing the voucher claim (if eligible), one 10–15 USDso-equivalent POST_ONLY order, and cancellation.
 4. Inspect the uploaded receipt. A transaction hash alone is not enough: the test passes only if the order appears in open-order read-back, is cancelled, disappears from read-back, and reports zero fills.
 
 This workflow has only been typechecked; it has **not** sent a transaction. Never use a private key that controls mainnet funds.
 
-## Run checks
+## Security and dependency audit\n\nCI now runs `npm audit --audit-level=high` and verifies the installed dependency tree. The repository currently has no committed `package-lock.json`; the audit job generates a temporary lockfile during CI. This detects known advisories for the resolved dependency tree in that run, but dependency versions are not yet reproducible across separate clean installs. Commit a reviewed lockfile before treating dependency resolution as fully reproducible. API handlers return generic upstream failure messages rather than exposing raw SDK exception strings.\n\n## Run checks
 
 Requires Node.js 20.19+.
 

@@ -71,13 +71,13 @@ function update(){
   const threshold=$("threshold-note");threshold.classList.toggle("warning",s.thresholdStatus!=="above-estimate");
   threshold.querySelector("strong")!.textContent=s.thresholdStatus==="above-estimate"?"Above estimated maintenance":"At or below estimated maintenance";
   threshold.querySelector("p")!.textContent=s.thresholdStatus==="above-estimate"?"Positive headroom in this simplified model. This is not an official liquidation status.":"This model's headroom is non-positive. It does not prove that dreamDEX would liquidate this position.";
-  setText("scenario-status",lastRunAt?"SCENARIO UPDATED":"READY TO RUN");
+  setText("scenario-status",lastRunAt?"SCENARIO REVIEWED":"LIVE PREVIEW");
   setText("report-meta","Local estimate · "+new Date(s.createdAt).toLocaleTimeString());
   setText("funding-note",s.funding.enabled?"Assumes "+fmt(s.funding.rate8hPercent,3)+"% per 8h period for "+s.funding.periods+" full periods, applied to entry notional.":"Funding is off. Turn it on to model an explicit constant-rate assumption.");
   document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.classList.toggle("selected",Number(b.dataset.shock)===shock));
  }catch(e){setText("scenario-status","CHECK INPUTS");setText("export-feedback",e instanceof Error?e.message:"Please check your inputs.");}
 }
-function markRun(){lastRunAt=new Date().toISOString();update();setText("scenario-status","SCENARIO CALCULATED");$("results").scrollIntoView({behavior:"smooth",block:"start"});}
+function markRun(){lastRunAt=new Date().toISOString();update();setText("scenario-status","SCENARIO REVIEWED");$("results").scrollIntoView({behavior:"smooth",block:"start"});}
 function download(){
  try{const s=compute();latest=s;const report={...s,generatedAt:new Date().toISOString(),verification:{onChain:false,liveAccountDataUsed:false,transactionHash:null},disclaimer:"This is a local scenario estimate, not on-chain evidence, financial advice, an official liquidation price, or a prediction of protocol liquidation behavior."};const blob=new Blob([JSON.stringify(report,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="perps-stress-lab-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";a.click();URL.revokeObjectURL(url);setText("export-feedback","Scenario JSON exported. It is labelled as local, non-on-chain evidence.");}catch(e){setText("export-feedback",e instanceof Error?e.message:"Unable to export this scenario.");}
 }
@@ -131,11 +131,11 @@ async function loadMarkets(){
  }
  update();
 }
-document.querySelectorAll<HTMLButtonElement>("[data-side]").forEach(b=>b.addEventListener("click",()=>{side=b.dataset.side as Side;document.querySelectorAll("[data-side]").forEach(x=>x.classList.toggle("active",x===b));update();}));
-document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.addEventListener("click",()=>{ $<HTMLInputElement>("shock").value=b.dataset.shock!;update();}));
-["entry","quantity","maintenance","starting-margin","shock","funding-rate","funding-periods","market"].forEach(id=>$<HTMLInputElement | HTMLSelectElement>(id).addEventListener("input",()=>{if(id==="starting-margin"){const percent=num("starting-margin");const leverage=$<HTMLSelectElement>("leverage");const choices=[2,5,10,20];leverage.value=String(choices.reduce((best,current)=>Math.abs(100/current-percent)<Math.abs(100/best-percent)?current:best,choices[0]));}if(id==="entry"){entryPriceSource="manual-input";priceReference={source:"manual input",timestamp:null,bestBid:null,bestAsk:null};}update();if(id==="market")void loadMarketPrice(val("market"));}));
-$("funding-toggle").addEventListener("change",()=>{const enabled=$<HTMLInputElement>("funding-toggle").checked; $("funding-fields").setAttribute("aria-disabled",String(!enabled));$<HTMLInputElement>("funding-rate").disabled=!enabled;$<HTMLSelectElement>("funding-periods").disabled=!enabled;update();});
-$<HTMLSelectElement>("leverage").addEventListener("change",()=>{$<HTMLInputElement>("starting-margin").value=String(100/num("leverage"));update();});
+document.querySelectorAll<HTMLButtonElement>("[data-side]").forEach(b=>b.addEventListener("click",()=>{lastRunAt=null;side=b.dataset.side as Side;document.querySelectorAll("[data-side]").forEach(x=>x.classList.toggle("active",x===b));update();}));
+document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.addEventListener("click",()=>{lastRunAt=null; $<HTMLInputElement>("shock").value=b.dataset.shock!;update();}));
+["entry","quantity","maintenance","starting-margin","shock","funding-rate","funding-periods","market"].forEach(id=>$<HTMLInputElement | HTMLSelectElement>(id).addEventListener("input",()=>{lastRunAt=null;if(id==="starting-margin"){const percent=num("starting-margin");const leverage=$<HTMLSelectElement>("leverage");const choices=[2,5,10,20];leverage.value=String(choices.reduce((best,current)=>Math.abs(100/current-percent)<Math.abs(100/best-percent)?current:best,choices[0]));}if(id==="entry"){entryPriceSource="manual-input";priceReference={source:"manual input",timestamp:null,bestBid:null,bestAsk:null};}update();if(id==="market")void loadMarketPrice(val("market"));}));
+$("funding-toggle").addEventListener("change",()=>{lastRunAt=null;const enabled=$<HTMLInputElement>("funding-toggle").checked; $("funding-fields").setAttribute("aria-disabled",String(!enabled));$<HTMLInputElement>("funding-rate").disabled=!enabled;$<HTMLSelectElement>("funding-periods").disabled=!enabled;update();});
+$<HTMLSelectElement>("leverage").addEventListener("change",()=>{lastRunAt=null;$<HTMLInputElement>("starting-margin").value=String(100/num("leverage"));update();});
 $("run-scenario").addEventListener("click",markRun);
 $("export-json").addEventListener("click",download);
 $("copy-summary").addEventListener("click",()=>void copySummary());

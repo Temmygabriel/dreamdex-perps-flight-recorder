@@ -9,12 +9,14 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@somnia-chain/markets-sdk", () => ({
   SOMNIA_HIDEKI_TESTNET_ADDRESSES: {},
-  SomniaMarkets: vi.fn(() => ({
+  SomniaMarkets: vi.fn(function () {
+    return {
     client: { listPerpMarkets: mocks.listPerpMarkets },
     loadMarkets: mocks.loadMarkets,
     fetchOrderBook: mocks.fetchOrderBook,
     close: mocks.close,
-  })),
+    };
+  }),
 }));
 
 vi.mock("@somnia-chain/markets-sdk/chains", () => ({
@@ -90,6 +92,15 @@ describe("GET /api/market-price", () => {
     expect((state.body as { priceSource: string }).priceSource).toContain("not the protocol mark price");
     expect(mocks.fetchOrderBook).toHaveBeenCalledWith("BTC/USDso:USDso", 1);
     expect(mocks.close).toHaveBeenCalledOnce();
+  });
+
+  it("does not leak raw upstream exception details to API clients", async () => {
+    mocks.listPerpMarkets.mockRejectedValue(new Error("private upstream URL and internal query details"));
+    const { res, state } = responseHarness();
+    await handler({ method: "GET", query: { symbol: "BTC-USDso" } } as never, res);
+    expect(state.statusCode).toBe(502);
+    expect(state.body).toMatchObject({ ok: false, error: "Order-book data is temporarily unavailable. Please retry shortly." });
+    expect(JSON.stringify(state.body)).not.toContain("private upstream URL");
   });
 
   it("fails closed when the order book is not two-sided", async () => {
