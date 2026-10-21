@@ -3,7 +3,7 @@ import {
   SomniaMarkets,
 } from "@somnia-chain/markets-sdk";
 import { hidekiTestnet } from "@somnia-chain/markets-sdk/chains";
-import { formatUnits, parseUnits, type Hex } from "viem";
+import { createPublicClient, http, parseUnits, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 const rpcUrl = "https://api.hideki2.infra.testnet.somnia.network";
@@ -30,7 +30,8 @@ async function main(): Promise<void> {
   } as never);
 
   try {
-    const chainId = await exchange.client.getChainId();
+    const publicClient = createPublicClient({ chain: hidekiTestnet, transport: http(rpcUrl, { timeout: 15_000 }) });
+    const chainId = await publicClient.getChainId();
     if (chainId !== 50383) throw new Error(`Wrong chain ID: ${chainId}`);
     const rows = await exchange.client.listPerpMarkets() as any[];
     const btc = rows.find((row) => String(row.baseSymbol).toUpperCase() === "BTC");
