@@ -111,13 +111,17 @@ test("keeps the mobile UI spaced and free of leaked glyphs", async ({ page }) =>
     viewport: document.documentElement.clientWidth,
     content: document.documentElement.scrollWidth,
     nav: getComputedStyle(document.querySelector(".nav-list")!).display,
+    gridDisplay: getComputedStyle(document.querySelector(".metric-grid")!).display,
+    gridColumns: getComputedStyle(document.querySelector(".metric-grid")!).gridTemplateColumns,
+    gridParent: document.querySelector(".metric-grid")?.parentElement?.className,
     cardRects: Array.from(document.querySelectorAll(".metric-card")).map((el) => {
       const rect = el.getBoundingClientRect();
-      return { left: rect.left, top: rect.top };
+      return { left: rect.left, top: rect.top, width: rect.width };
     }),
   }));
   expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
   expect(dimensions.nav).not.toBe("none");
+  console.log("MOBILE_LAYOUT_DIAGNOSTIC", JSON.stringify(dimensions));
   expect(dimensions.cardRects).toHaveLength(4);
   expect(dimensions.cardRects[0].left).not.toBe(dimensions.cardRects[1].left);
   expect(dimensions.cardRects[0].top).toBe(dimensions.cardRects[1].top);
