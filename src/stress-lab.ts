@@ -1,7 +1,7 @@
 import { calculateStress } from "./stress-model.js";
 type Side = "long" | "short";
 type MarketRecord = { symbol?: string; name?: string; baseSymbol?: string; quoteSymbol?: string; markPrice?: number|string; mark?: number|string; price?: number|string; minQuantity?: number|string; minSize?: number|string; tickSize?: number|string; lotSize?: number|string; maintenanceMarginRate?: number|string; maintenanceMargin?: number|string; [key:string]: unknown };
-type Scenario = { createdAt:string; product:"Perps Stress Lab"; version:"0.1.0"; network:{name:string;chainId:number}; source:"manual-input"; side:Side; market:string; entryPrice:number; quantity:number; leverage:number; startingMarginPercent:number; startingMarginUsd:number; shockPercent:number; stressedPrice:number; pnlUsd:number; funding:{enabled:boolean;rate8hPercent:number;periods:number;estimatedUsd:number;assumption:string}; equityUsd:number; maintenancePercent:number; maintenanceUsd:number; headroomUsd:number; thresholdStatus:"above-estimate"|"at-or-below-estimate"; assumptions:string[] };
+type Scenario = { createdAt:string; product:"Perps Stress Lab"; version:"0.1.0"; network:{name:string;chainId:number}; source:"manual-input"|"live-order-book-midpoint"; priceReference:{source:string;timestamp:string|null;bestBid:number|null;bestAsk:number|null}; side:Side; market:string; entryPrice:number; quantity:number; leverage:number; startingMarginPercent:number; startingMarginUsd:number; shockPercent:number; stressedPrice:number; pnlUsd:number; funding:{enabled:boolean;rate8hPercent:number;periods:number;estimatedUsd:number;assumption:string}; equityUsd:number; maintenancePercent:number; maintenanceUsd:number; headroomUsd:number; thresholdStatus:"above-estimate"|"at-or-below-estimate"; assumptions:string[] };
 const $ = <T extends HTMLElement>(id:string) => document.getElementById(id) as T;
 const fmt = (n:number, digits=2) => Number.isFinite(n) ? new Intl.NumberFormat("en-US",{minimumFractionDigits:digits,maximumFractionDigits:digits}).format(n) : "—";
 const usd = (n:number) => (n < 0 ? "−$" : "$") + fmt(Math.abs(n));
@@ -10,6 +10,8 @@ let side:Side = "long";
 let markets:MarketRecord[] = [];
 let latest:Scenario | null = null;
 let lastRunAt:string | null = null;
+let entryPriceSource: "manual-input" | "live-order-book-midpoint" = "manual-input";
+let priceReference: {source:string;timestamp:string|null;bestBid:number|null;bestAsk:number|null} = {source:"manual input",timestamp:null,bestBid:null,bestAsk:null};
 
 function num(id:string):number { return Number($<HTMLInputElement | HTMLSelectElement>(id).value); }
 function val(id:string):string { return $<HTMLInputElement | HTMLSelectElement>(id).value; }
@@ -35,9 +37,10 @@ function compute(){
     "Maintenance requirement = quantity × stressed price × user-entered maintenance percentage.",
     "Fees, slippage, realised/unrealised accounting differences, liquidation execution, insurance, backstop and ADL are excluded.",
     "Funding uses the entry notional, a constant user-entered 8h rate and full 8h periods; it is not a forecast of future rates.",
-    "This result is not an official dreamDEX liquidation price or liquidation status."
+    "This result is not an official dreamDEX liquidation price or liquidation status.",
+    "A live reference price, when present, is a top-of-book bid/ask midpoint, not the protocol mark price."
   ];
-  return {createdAt:new Date().toISOString(),product:"Perps Stress Lab",version:"0.1.0",network:{name:"Somnia Hideki Testnet",chainId:50383},source:"manual-input",side,market,entryPrice:x.entry,quantity:x.quantity,leverage:calculated.leverage,startingMarginPercent:x.marginPercent,startingMarginUsd:calculated.startingMarginUsd,shockPercent:x.shock,stressedPrice:calculated.stressedPrice,pnlUsd:calculated.pnlUsd,funding:{enabled:x.fundingEnabled,rate8hPercent:x.fundingRate,periods:x.periods,estimatedUsd:calculated.fundingUsd,assumption:x.fundingEnabled?"Constant rate over full 8h periods; calculated on entry notional.":"Funding excluded."},equityUsd:calculated.equityUsd,maintenancePercent:x.maintenance,maintenanceUsd:calculated.maintenanceUsd,headroomUsd:calculated.headroomUsd,thresholdStatus:calculated.thresholdStatus,assumptions} satisfies Scenario;
+  return {createdAt:new Date().toISOString(),product:"Perps Stress Lab",version:"0.1.0",network:{name:"Somnia Hideki Testnet",chainId:50383},source:entryPriceSource,priceReference:{...priceReference},side,market,entryPrice:x.entry,quantity:x.quantity,leverage:calculated.leverage,startingMarginPercent:x.marginPercent,startingMarginUsd:calculated.startingMarginUsd,shockPercent:x.shock,stressedPrice:calculated.stressedPrice,pnlUsd:calculated.pnlUsd,funding:{enabled:x.fundingEnabled,rate8hPercent:x.fundingRate,periods:x.periods,estimatedUsd:calculated.fundingUsd,assumption:x.fundingEnabled?"Constant rate over full 8h periods; calculated on entry notional.":"Funding excluded."},equityUsd:calculated.equityUsd,maintenancePercent:x.maintenance,maintenanceUsd:calculated.maintenanceUsd,headroomUsd:calculated.headroomUsd,thresholdStatus:calculated.thresholdStatus,assumptions} satisfies Scenario;
 }
 function update(){
  try{
@@ -81,6 +84,28 @@ function download(){
 async function copySummary(){
  try{const s=compute();const summary=["PERPS STRESS LAB — SCENARIO SUMMARY","Network: Somnia Hideki testnet (50383)","Source: manual hypothetical inputs; not on-chain evidence","Market: "+s.market,"Direction: "+s.side.toUpperCase(),"Entry: "+usd(s.entryPrice),"Quantity: "+fmt(s.quantity,8),"Shock: "+pct(s.shockPercent),"Stressed price: "+usd(s.stressedPrice),"Estimated P&L: "+usd(s.pnlUsd),"Estimated equity: "+usd(s.equityUsd),"Maintenance estimate: "+usd(s.maintenanceUsd),"Headroom: "+usd(s.headroomUsd),"Funding estimate: "+usd(s.funding.estimatedUsd),"","This simplified isolated-position estimate excludes fees, other positions, full protocol accounting and liquidation execution."].join("\n");await navigator.clipboard.writeText(summary);setText("export-feedback","Readable scenario summary copied.");}catch{setText("export-feedback","Clipboard access failed. Use Export scenario JSON instead.");}
 }
+async function loadMarketPrice(symbol:string){
+ try{
+  const response=await fetch("/api/market-price?symbol="+encodeURIComponent(symbol),{headers:{accept:"application/json"},cache:"no-store"});
+  if(!response.ok)throw new Error("Order-book endpoint returned HTTP "+response.status);
+  const payload=await response.json() as {ok?:boolean;referencePrice?:number;bestBid?:number;bestAsk?:number;priceSource?:string;timestamp?:string};
+  if(!payload.ok||!Number.isFinite(payload.referencePrice)||Number(payload.referencePrice)<=0)throw new Error("No valid reference price was returned.");
+  if(val("market")!==symbol)return;
+  $<HTMLInputElement>("entry").value=String(payload.referencePrice);
+  entryPriceSource="live-order-book-midpoint";
+  priceReference={source:payload.priceSource??"Top-of-book midpoint",timestamp:payload.timestamp??null,bestBid:Number(payload.bestBid),bestAsk:Number(payload.bestAsk)};
+  setText("market-hint","Live book midpoint "+usd(Number(payload.referencePrice))+" · not a mark price. Entry remains editable.");
+  setText("method-data","Read-only Hideki order book returned a two-sided quote for "+symbol+". The entry field is prefilled with its bid/ask midpoint; calculations do not use live account margin.");
+  update();
+ }catch(e){
+  if(val("market")!==symbol)return;
+  entryPriceSource="manual-input";
+  priceReference={source:"manual input; live book midpoint unavailable",timestamp:null,bestBid:null,bestAsk:null};
+  setText("market-hint","Live reference price unavailable; enter an entry price manually.");
+  setText("method-data","Could not load a live order-book midpoint: "+(e instanceof Error?e.message:"unknown error")+". The manual scenario remains available.");
+  update();
+ }
+}
 async function loadMarkets(){
  const status=$("data-status");status.innerHTML='<span class="status-dot muted"></span> Checking market data…';
  try{
@@ -96,12 +121,9 @@ async function loadMarkets(){
   for(const m of markets){const symbol=String(m.symbol??m.name??m.baseSymbol??"");if(!symbol)continue;const opt=document.createElement("option");opt.value=symbol;opt.textContent=symbol;select.append(opt);}
   if(!select.options.length)throw new Error("The response did not contain readable market symbols.");
   if([...select.options].some(o=>o.value===previous))select.value=previous;
-  const selected=markets.find(m=>String(m.symbol??m.name??m.baseSymbol??"")===select.value);
-  const price=Number(selected?.markPrice??selected?.mark??selected?.price);
-  if(Number.isFinite(price)&&price>0){$<HTMLInputElement>("entry").value=String(price);setText("market-hint","Read-only market endpoint returned a price. Confirm its source and freshness before using it.");}
-  else setText("market-hint","Market list loaded. No recognised price field; entry price remains a manual input.");
   status.innerHTML='<span class="status-dot"></span> Market list loaded';
-  setText("method-data","Read-only /api/markets responded with "+markets.length+" market rows. The stress formula still uses manual inputs and does not claim to read live account margin.");
+  setText("method-data","Loaded "+markets.length+" live Hideki market definitions. Fetching a read-only order-book midpoint for the selected market; no account margin or liquidation state is queried.");
+  await loadMarketPrice(select.value);
  }catch(e){
   status.innerHTML='<span class="status-dot muted"></span> Live data unavailable';
   setText("market-hint","Live market metadata unavailable; this remains a manual hypothetical scenario.");
@@ -111,7 +133,7 @@ async function loadMarkets(){
 }
 document.querySelectorAll<HTMLButtonElement>("[data-side]").forEach(b=>b.addEventListener("click",()=>{side=b.dataset.side as Side;document.querySelectorAll("[data-side]").forEach(x=>x.classList.toggle("active",x===b));update();}));
 document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.addEventListener("click",()=>{ $<HTMLInputElement>("shock").value=b.dataset.shock!;update();}));
-["entry","quantity","maintenance","starting-margin","shock","funding-rate","funding-periods","market"].forEach(id=>$<HTMLInputElement | HTMLSelectElement>(id).addEventListener("input",()=>{if(id==="starting-margin"){const percent=num("starting-margin");const leverage=$<HTMLSelectElement>("leverage");const choices=[2,5,10,20];leverage.value=String(choices.reduce((best,current)=>Math.abs(100/current-percent)<Math.abs(100/best-percent)?current:best,choices[0]));}update();}));
+["entry","quantity","maintenance","starting-margin","shock","funding-rate","funding-periods","market"].forEach(id=>$<HTMLInputElement | HTMLSelectElement>(id).addEventListener("input",()=>{if(id==="starting-margin"){const percent=num("starting-margin");const leverage=$<HTMLSelectElement>("leverage");const choices=[2,5,10,20];leverage.value=String(choices.reduce((best,current)=>Math.abs(100/current-percent)<Math.abs(100/best-percent)?current:best,choices[0]));}if(id==="entry"){entryPriceSource="manual-input";priceReference={source:"manual input",timestamp:null,bestBid:null,bestAsk:null};}update();if(id==="market")void loadMarketPrice(val("market"));}));
 $("funding-toggle").addEventListener("change",()=>{const enabled=$<HTMLInputElement>("funding-toggle").checked; $("funding-fields").setAttribute("aria-disabled",String(!enabled));$<HTMLInputElement>("funding-rate").disabled=!enabled;$<HTMLSelectElement>("funding-periods").disabled=!enabled;update();});
 $<HTMLSelectElement>("leverage").addEventListener("change",()=>{$<HTMLInputElement>("starting-margin").value=String(100/num("leverage"));update();});
 $("run-scenario").addEventListener("click",markRun);
