@@ -20,5 +20,7 @@ jobs:
         run: |
           sed -n '1,220p' node_modules/@somnia-chain/markets-sdk/dist/perp/voucher.js
           sed -n '1,160p' node_modules/@somnia-chain/markets-sdk/dist/perp/voucher.d.ts
+          sed -n '1090,1135p' node_modules/@somnia-chain/markets-sdk/dist/trade.d.ts
+          grep -R -n -E "defaultGas|gasLimit|claim reverted" node_modules/@somnia-chain/markets-sdk/dist/writer.js node_modules/@somnia-chain/markets-sdk/dist/writer.d.ts | head -100
           sed -n '4490,4565p' node_modules/@somnia-chain/markets-sdk/dist/somniaMarketsClient.d.ts
           grep -R -n -E "diagnosePerpVoucher|checkPerpVoucher|VoucherClaim" node_modules/@somnia-chain/markets-sdk/dist --include='*.js' --include='*.d.ts' | head -100 || true
