@@ -25,6 +25,13 @@ const pricePayload = {
 };
 
 test.beforeEach(async ({ page }) => {
+  page.on("pageerror", (error) => console.log("PAGE_ERROR", error.message));
+  page.on("console", (message) => { if (message.type() === "error") console.log("BROWSER_CONSOLE_ERROR", message.text()); });
+  page.on("response", (response) => {
+    if (response.url().includes("app.css") || response.url().includes("stress-lab.ts")) {
+      console.log("APP_ASSET_RESPONSE", response.status(), response.url(), response.headers()["content-type"] ?? "");
+    }
+  });
   await page.route("**/api/markets", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
