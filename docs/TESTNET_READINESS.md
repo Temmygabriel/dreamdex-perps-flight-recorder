@@ -18,6 +18,8 @@ Last read-only check: 21 October 2026 (UTC). This is a timestamped diagnostic sn
 
 Interpretation: native STT gas was present, but the Perps account did not yet have usable USDso collateral. The SDK's official developer guide describes a one-time 1,000 paper-USDso Perps voucher claim for an eligible address with no open Perps positions or orders. Claiming it is an on-chain transaction; the current readiness check intentionally does not claim it.
 
+The repository now contains a manually triggered, hard-capped POST_ONLY order/cancel workflow. It blocks the previously tested wallet address and is intentionally not push-triggered. It has been typechecked but not executed.
+
 ## Still required before calling the bounty flow end-to-end verified
 
 1. Use a dedicated testnet-only key; do not reuse a wallet key that controls mainnet funds.

@@ -48,12 +48,24 @@ Optional funding is a deliberately simplified scenario: positive 8-hour rate mea
 - [x] Formula tests validate long and short cases, shock direction, funding signs and invalid-input boundaries.
 - [x] CI performs a read-only Perps account readiness check: voucher eligibility and SDK max-order-size gate, without signing or sending a transaction.
 - [ ] Any account-aware stress mode is implemented only after the SDK exposes the required Perps account data and it is validated against the protocol.
-- [ ] If a separate testnet order flow is ever added, the user explicitly approves the transaction and the app verifies transaction receipt, read-back and cleanup.
+- [ ] A manual, explicitly confirmed testnet order workflow is implemented with a hard 10–15 USDso notional cap, POST_ONLY order, cancellation, and a key-rotation safety stop. It has **not** been executed yet; order receipt, read-back and cleanup remain unverified.
 - [ ] Public Vercel deployment is tested on desktop and mobile.
 - [x] Playwright browser smoke tests cover live-price prefill, long/short P&L direction, honest JSON export flags, and mobile overflow against mocked API responses.
 - [ ] Deployed preview smoke check confirms the Vercel serverless endpoints are live and returning fresh Hideki data. The preview is currently access-protected; the check reports a skip unless `VERCEL_AUTOMATION_BYPASS_SECRET` is configured in GitHub Actions.
 
 A successful market read does not validate the stress model. A successful order does not prove liquidation accuracy. The model must not claim protocol-accurate liquidation prediction without independently validated account-equity rules, fees, funding, cross-margin interactions and liquidation-engine behaviour.
+
+## Manual testnet order lifecycle (not yet executed)
+
+The repository includes [a manual GitHub Actions workflow](.github/workflows/testnet-order-smoke.yml) that can claim the paper-USDso voucher if eligible, then place one capped POST_ONLY BTC order and cancel it. It is deliberately not triggered by pushes or pull requests.
+
+Before running it:
+1. Replace the existing `wallet_key` Actions secret with a **fresh, dedicated testnet-only key**. The workflow refuses the previously tested address.
+2. Ensure the new wallet has Hideki testnet STT for gas.
+3. After this branch is merged, open Actions → **Perps Stress Lab testnet order smoke** → Run workflow. Select `YES` only when authorizing the voucher claim (if eligible), one 10–15 USDso-equivalent POST_ONLY order, and cancellation.
+4. Inspect the uploaded receipt. A transaction hash alone is not enough: the test passes only if the order appears in open-order read-back, is cancelled, disappears from read-back, and reports zero fills.
+
+This workflow has only been typechecked; it has **not** sent a transaction. Never use a private key that controls mainnet funds.
 
 ## Run checks
 
