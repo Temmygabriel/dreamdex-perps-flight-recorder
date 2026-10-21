@@ -1,19 +1,22 @@
-# OrderProof — dreamDEX Perps
+# Perps Practice Desk — dreamDEX Perps
 
-**Check your order. Prove what happened.**
+**Plan a test. Check the limits. Verify what happened.**
 
-OrderProof is a testnet debugging workbench for dreamDEX Perps builders, integrators and bug reporters. Its job is to make an order problem reproducible: inspect live market and account rules, save the exact pass/block response, and—when a live test is justified and explicitly approved—record a testnet order, cancellation and read-back result.
+Perps Practice Desk is a guided practice-session product for dreamDEX Perps on Somnia Hideki/Tokyo testnet. A user records a short trade thesis, chooses a maximum order value, checks live market and account constraints, and—only after an explicit wallet approval—can place a post-only testnet order, cancel it, and record the read-back result.
 
-It is **not intended as a daily consumer trading app**. Traders already have dreamDEX's own interface; SDK builders and testers are the people most likely to return to OrderProof while integrating, debugging and documenting edge cases. The product's value depends on diagnostic exports that explain failures as well as receipts that record successful runs.
+The repeat-use loop is **plan → check → execute → verify → journal → repeat**. The local journal stores session notes and transaction hashes in the browser and can be exported as JSON. It is not a cloud account, does not claim profitability, and does not independently verify imported receipts. The order-value budget is a guardrail, not a maximum-loss guarantee. This is an independent community project, not the official dreamDEX website.
 
 It is built for the dreamDEX Perps Builder Bounty on Somnia Tokyo/Hideki testnet (chain ID `50383`).
 
 ## What it does
 
-1. **Reads live markets.** Shows markets and the correct price tick, size step, minimum size and decimal precision returned by dreamDEX's SDK.
-2. **Checks an intended order.** Checks the price and quantity against market rules, then calls the SDK's live order-size preflight for the chosen account.
-3. **Explains a block.** Makes an invalid price/size, stale mark or account-size limit visible before the user attempts a trade.
-4. **Exports diagnostics and evidence.** A blocked or passing read-only preflight can be saved as a JSON diagnostic. When the user chooses to run a test, the browser wallet authorizes a post-only testnet order; OrderProof records transaction hashes, reads the open-order state, supports cancellation, and saves a JSON receipt.
+1. **Records a plan.** Requires a short thesis before preflight and lets the user choose a 5, 10, or 25 paper-USDso order-value cap.
+2. **Reads live markets.** Shows the current market tick, lot, minimum size and decimal precision from dreamDEX's SDK.
+3. **Checks the order.** Runs SDK account-size preflight and blocks an order that exceeds the chosen session cap. The cap is checked again immediately before wallet signing.
+4. **Executes only with approval.** The browser wallet signs a post-only order on chain `50383`; the app never requests a private key.
+5. **Verifies lifecycle evidence.** Reads whether the order appears, allows explicit cancellation, and checks whether it disappears afterward.
+6. **Keeps a local journal.** Stores pending, verified, or incomplete session records in this browser and exports them as JSON. The journal is local convenience, not an independent chain audit.
+7. **Exports evidence.** A blocked preflight diagnostic or order lifecycle receipt can be downloaded and reviewed.
 
 A preflight pass does **not** guarantee a transaction will later succeed. Market prices, order-book depth and account state can change.
 
@@ -26,11 +29,11 @@ If preflight reports `walletBalance`, the order geometry can still be valid whil
 3. If the paper USDso is in Spot, use **Perps ⇆ Spot** on the Perps page to move it into the Perps account. Orders use Perps margin.
 4. STT is testnet gas; USDso is trading margin. They are different balances.
 
-OrderProof currently signs direct `placeOrder` and `cancelOrder` calls from the connected browser-wallet address. That address must be the account that actually owns the margin being checked. Never assume a sign-in wallet and a separate dreamDEX trading wallet are interchangeable.
+Perps Practice Desk currently signs direct `placeOrder` and `cancelOrder` calls from the connected browser-wallet address. That address must be the account that actually owns the margin being checked. Never assume a sign-in wallet and a separate dreamDEX trading wallet are interchangeable.
 
 ## Wallet security alerts
 
-OrderProof is an independent community project, not the official dreamDEX website. If MetaMask displays a phishing or wallet-draining warning for this site, do **not** bypass the alert or sign a transaction to get past it. Verify the URL and request a review through [MetaMask's security-alert guidance](https://support.metamask.io/configure/wallet/security-alerts). A code change cannot clear MetaMask's website-reputation classification.
+Perps Practice Desk is an independent community project, not the official dreamDEX website. If MetaMask displays a phishing or wallet-draining warning for this site, do **not** bypass the alert or sign a transaction to get past it. Verify the URL and request a review through [MetaMask's security-alert guidance](https://support.metamask.io/configure/wallet/security-alerts). A code change cannot clear MetaMask's website-reputation classification.
 
 ## Current status
 
