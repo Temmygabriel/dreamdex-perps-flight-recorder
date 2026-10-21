@@ -313,3 +313,5 @@ footer{border-color:#dbe3ec;color:#718096;font-size:9px;line-height:1.8}
 /* Override the legacy dark metric-card declarations with the light UI. */
 .stress-panel .metric-grid{border-top-color:#e0e6ee}
 .stress-panel .metric-card{background:#fbfcfe;border-color:#e0e6ee;box-shadow:none}
+
+@media(max-width:760px){.stress-panel>.metric-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;}}
