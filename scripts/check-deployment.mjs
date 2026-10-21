@@ -23,7 +23,31 @@ async function getJson(path) {
   return response.json();
 }
 
+async function probeRoot() {
+  try {
+    const response = await fetch(base, {
+      headers: { accept: "text/html" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    });
+    const html = await response.text();
+    const result = {
+      status: response.status,
+      finalUrl: response.url,
+      stressLabBranding: html.includes("Perps Stress Lab"),
+      contentType: response.headers.get("content-type") ?? "unknown",
+    };
+    console.log(`Deployment root probe: HTTP ${result.status}; Stress Lab branding: ${result.stressLabBranding}; content type: ${result.contentType}`);
+    return result;
+  } catch (error) {
+    const result = { status: 0, finalUrl: base, stressLabBranding: false, contentType: "unavailable" };
+    console.log("Deployment root probe failed:", error instanceof Error ? error.message : "unknown error");
+    return result;
+  }
+}
+
 async function main() {
+  const rootProbe = await probeRoot();
   let marketsPayload;
   let lastError;
   for (let attempt = 1; attempt <= 8; attempt++) {
@@ -38,7 +62,7 @@ async function main() {
       if (attempt < 8) await wait(4_000);
     }
   }
-  if (!marketsPayload) throw new Error(`Market endpoint never became ready: ${lastError?.message ?? "unknown error"}`);
+  if (!marketsPayload) throw new Error(`Market endpoint never became ready: ${lastError?.message ?? "unknown error"}; root probe HTTP ${rootProbe.status}, Stress Lab branding ${rootProbe.stressLabBranding}`);
   if (marketsPayload.ok !== true || marketsPayload.network?.chainId !== 50383 || !Array.isArray(marketsPayload.markets) || marketsPayload.markets.length === 0) {
     throw new Error("Market endpoint returned an unexpected payload or wrong chain ID.");
   }
