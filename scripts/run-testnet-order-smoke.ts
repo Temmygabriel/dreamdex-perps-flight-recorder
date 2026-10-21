@@ -116,8 +116,30 @@ async function main(): Promise<void> {
 
     const eligibility = await exchange.client.getPerpVoucherEligibility(market.marginBank, account.address);
     if (eligibility.eligible) {
+      const campaign = await exchange.client.getPerpVoucherCampaign(market.marginBank);
+      if (!campaign) throw new Error("Voucher eligibility was true but no live campaign was resolved; stopping before any transaction.");
+      const voucherState = await exchange.client.getPerpVoucher(market.marginBank, account.address);
+      if (voucherState?.claimed) throw new Error("The current account is already marked as having claimed this voucher; stopping before any transaction.");
       console.log("Perps voucher is eligible. Claiming the one-time testnet paper-USDso voucher as explicitly approved by this manual workflow.");
-      const claimResult = await exchange.trader.claimPerpVoucher({ marginBank: market.marginBank });
+      console.log("Using the exact distributor resolved from the live campaign; the account remains on Hideki testnet.");
+      let claimResult;
+      try {
+        claimResult = await exchange.trader.claimPerpVoucher({ distributor: campaign.distributor });
+      } catch (claimError) {
+        const safeDetails: Record<string, unknown> = {};
+        let current: any = claimError;
+        for (let depth = 0; depth < 4 && current; depth += 1) {
+          for (const key of ["name", "message", "shortMessage", "code", "data", "transactionHash", "hash"]) {
+            const value = current[key];
+            if ((typeof value === "string" || typeof value === "number") && value !== "") {
+              safeDetails[`cause${depth}_${key}`] = value;
+            }
+          }
+          current = current.cause;
+        }
+        console.error("Voucher claim structured error (no key material):", stringify(safeDetails));
+        throw claimError;
+      }
       const possibleHash = typeof claimResult === "string"
         ? claimResult
         : (claimResult as { transactionHash?: string; hash?: string } | null)?.transactionHash
