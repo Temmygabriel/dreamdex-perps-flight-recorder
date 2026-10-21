@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@somnia-chain/markets-sdk": "0.32.1",
@@ -22,7 +23,8 @@
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
     "vitest": "^3.2.4",
-    "vite": "8.3.4"
+    "vite": "8.3.4",
+    "@playwright/test": "1.55.0"
   },
   "engines": {
     "node": ">=20.19.0"

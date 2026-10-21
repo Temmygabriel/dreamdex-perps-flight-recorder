@@ -14,7 +14,7 @@ jobs:
   checks:
     name: Typecheck and deterministic tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -105,3 +105,27 @@ jobs:
 
       - name: Verify deployed read-only market and midpoint APIs
         run: node scripts/check-deployment.mjs
+
+  browser-e2e:
+    name: Browser interaction smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install packages
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser interaction tests
+        run: npm run test:e2e
