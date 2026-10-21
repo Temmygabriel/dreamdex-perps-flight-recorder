@@ -18,7 +18,7 @@ describe("calculateStress", () => {
   it("reverses directional P&L for a short", () => {
     const result = calculateStress({ ...base, side: "short", shockPercent: 10 });
     expect(result.stressedPrice).toBeCloseTo(110_000, 8);
-    expect(result.pnlUsd).toBe(-100);
+    expect(result.pnlUsd).toBeCloseTo(-100, 8);
   });
 
   it("gives a short positive P&L when price falls", () => {
