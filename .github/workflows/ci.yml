@@ -65,7 +65,7 @@ jobs:
 
   test-wallet-read-only:
     name: Optional funded test wallet check (read-only)
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'rebuild/perps-stress-lab')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
