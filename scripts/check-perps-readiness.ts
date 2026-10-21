@@ -50,6 +50,9 @@ async function main(): Promise<void> {
     if (!sdkMarket?.symbol) throw new Error("The SDK could not resolve BTC Perps to an order book.");
 
     const book = await exchange.fetchOrderBook(sdkMarket.symbol, 1);
+    const openOrders = await exchange.fetchOpenOrders(sdkMarket.symbol);
+    let positions: unknown = "position read not available";
+    try { positions = await exchange.fetchPositions([sdkMarket.symbol]); } catch (error) { positions = error instanceof Error ? error.message : "position read failed"; }
     const bid = Number(book.bids?.[0]?.[0]);
     if (!Number.isFinite(bid) || bid <= 0) throw new Error("The BTC order book did not return a valid best bid.");
     const quoteDecimals = Number(btc.quoteDecimals);
@@ -64,10 +67,15 @@ async function main(): Promise<void> {
 
     console.log("READ-ONLY PERPS READINESS CHECK");
     console.log(`Network: Somnia Hideki testnet (chain ID ${chainId})`);
-    console.log(`Derived account: ${account}`);
+    console.log(`Derived EOA: ${derivedAccount.address}`);
+    console.log(`SDK wallet address: ${String(exchange.walletAddress ?? "not exposed")}`);
+    console.log(`Readiness account used: ${account}`);
     console.log(`Native balance check is handled by the separate wallet step.`);
     console.log(`Market: BTC (${sdkMarket.symbol})`);
     console.log(`Best bid: ${bid} USDso`);
+    console.log("Open orders for BTC market:", openOrders.length);
+    console.log("Position read:");
+    console.log(json(positions));
     console.log("Voucher eligibility:");
     console.log(json(eligibility));
     console.log("Voucher campaign state:");
