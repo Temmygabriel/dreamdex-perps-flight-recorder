@@ -41,7 +41,7 @@ test.beforeEach(async ({ page }) => {
 test("prefills the selected market from a labelled read-only book midpoint", async ({ page }) => {
   await expect(page.locator("#market-hint")).toContainText("Live book midpoint");
   await expect(page.locator("#entry")).toHaveValue("100000");
-  await expect(page.locator("#method-data")).toContainText("not the protocol mark price");
+  await expect(page.locator("#market-hint")).toContainText("not a mark price");
   await expect(page.locator("#data-status")).toContainText("Market list loaded");
 });
 

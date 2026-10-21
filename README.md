@@ -49,6 +49,8 @@ Optional funding is a deliberately simplified scenario: positive 8-hour rate mea
 - [ ] Any account-aware mode is implemented only if the SDK exposes the required Perps account data and it is validated against the protocol.
 - [ ] If a separate testnet order flow is ever added, the user explicitly approves the transaction and the app verifies transaction receipt, read-back and cleanup.
 - [ ] Public Vercel deployment is tested on desktop and mobile.
+- [x] Playwright browser smoke tests cover live-price prefill, long/short P&L direction, honest JSON export flags, and mobile overflow against mocked API responses.
+- [ ] Deployed preview smoke check confirms the Vercel serverless endpoints are live and returning fresh Hideki data.
 
 A successful market read does not validate the stress model. A successful order does not prove liquidation accuracy. The model must not claim protocol-accurate liquidation prediction without independently validated account-equity rules, fees, funding, cross-margin interactions and liquidation-engine behaviour.
 
@@ -60,6 +62,7 @@ Requires Node.js 20.19+.
 npm install
 npm run typecheck
 npm test
+npm run test:e2e
 npm run build
 ```
 
