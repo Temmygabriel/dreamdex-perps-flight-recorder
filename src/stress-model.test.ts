@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { calculateStress } from "./stress-model.js";
 
-const base = { side: "long" as const, entryPrice: 100_000, quantity: 0.01, startingMarginPercent: 10, shockPercent: -10, maintenancePercent: 2.5 };
+const base = {
+  side: "long" as const,
+  entryPrice: 100_000,
+  quantity: 0.01,
+  startingMarginPercent: 10,
+  shockPercent: -10,
+  maintenancePercent: 2.5,
+};
 
 describe("calculateStress", () => {
   it("calculates a long loss, equity, maintenance and headroom", () => {
@@ -32,15 +39,70 @@ describe("calculateStress", () => {
     expect(short.fundingUsd).toBeCloseTo(2.4);
   });
 
-  it("handles zero shock as zero P&L", () => {
-    expect(calculateStress({ ...base, shockPercent: 0 }).pnlUsd).toBe(0);
+  it("ignores a supplied funding rate when funding is disabled", () => {
+    const result = calculateStress({ ...base, shockPercent: 0, fundingEnabled: false, fundingRate8hPercent: 12, fundingPeriods: 9 });
+    expect(result.fundingUsd).toBe(0);
+    expect(result.equityUsd).toBe(result.startingMarginUsd);
+  });
+
+  it("handles zero shock as zero P&L and unchanged price", () => {
+    const result = calculateStress({ ...base, shockPercent: 0 });
+    expect(result.pnlUsd).toBe(0);
+    expect(result.stressedPrice).toBe(base.entryPrice);
+  });
+
+  it("handles a total price loss without producing a negative price", () => {
+    const result = calculateStress({ ...base, shockPercent: -100 });
+    expect(result.stressedPrice).toBe(0);
+    expect(result.maintenanceUsd).toBe(0);
+    expect(result.pnlUsd).toBe(-base.entryPrice * base.quantity);
+  });
+
+  it("preserves long/short symmetry for equal absolute shocks", () => {
+    const longUp = calculateStress({ ...base, shockPercent: 7 });
+    const shortUp = calculateStress({ ...base, side: "short", shockPercent: 7 });
+    expect(longUp.pnlUsd).toBe(-shortUp.pnlUsd);
+    const longDown = calculateStress({ ...base, shockPercent: -7 });
+    const shortDown = calculateStress({ ...base, side: "short", shockPercent: -7 });
+    expect(longDown.pnlUsd).toBe(-shortDown.pnlUsd);
+  });
+
+  it("scales P&L and maintenance linearly with quantity", () => {
+    const one = calculateStress({ ...base, quantity: 0.01 });
+    const two = calculateStress({ ...base, quantity: 0.02 });
+    expect(two.pnlUsd).toBeCloseTo(one.pnlUsd * 2, 8);
+    expect(two.maintenanceUsd).toBeCloseTo(one.maintenanceUsd * 2, 8);
+    expect(two.startingMarginUsd).toBeCloseTo(one.startingMarginUsd * 2, 8);
+  });
+
+  it("reports headroom as equity minus maintenance and status consistently", () => {
+    for (const shockPercent of [-100, -50, -10, 0, 10, 50]) {
+      const result = calculateStress({ ...base, shockPercent });
+      expect(result.headroomUsd).toBeCloseTo(result.equityUsd - result.maintenanceUsd, 8);
+      expect(result.thresholdStatus).toBe(result.headroomUsd > 0 ? "above-estimate" : "at-or-below-estimate");
+    }
   });
 
   it("rejects invalid prices, quantities and margin assumptions", () => {
     expect(() => calculateStress({ ...base, entryPrice: 0 })).toThrow(/Entry price/);
     expect(() => calculateStress({ ...base, quantity: -1 })).toThrow(/Quantity/);
     expect(() => calculateStress({ ...base, startingMarginPercent: 0 })).toThrow(/Starting margin/);
+    expect(() => calculateStress({ ...base, startingMarginPercent: 101 })).toThrow(/Starting margin/);
     expect(() => calculateStress({ ...base, shockPercent: -101 })).toThrow(/negative price/);
+    expect(() => calculateStress({ ...base, maintenancePercent: 0 })).toThrow(/Maintenance margin/);
     expect(() => calculateStress({ ...base, fundingPeriods: 1.5, fundingEnabled: true })).toThrow(/whole number/);
+  });
+
+  it("rejects non-finite values and runtime-invalid side values", () => {
+    expect(() => calculateStress({ ...base, entryPrice: Number.NaN })).toThrow(/finite numbers/);
+    expect(() => calculateStress({ ...base, quantity: Number.POSITIVE_INFINITY })).toThrow(/finite numbers/);
+    expect(() => calculateStress({ ...base, fundingRate8hPercent: Number.NaN })).toThrow(/finite numbers/);
+    expect(() => calculateStress({ ...base, side: "flat" as "long" })).toThrow(/side must be long or short/i);
+  });
+
+  it("rejects arithmetic overflow instead of returning infinite output", () => {
+    expect(() => calculateStress({
+      ...base, entryPrice: Number.MAX_VALUE, quantity: Number.MAX_VALUE, shockPercent: 50,
+    })).toThrow(/numeric range/);
   });
 });
