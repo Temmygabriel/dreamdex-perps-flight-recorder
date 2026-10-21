@@ -11,6 +11,32 @@ permissions:
   contents: read
 
 jobs:
+  dependency-security-audit:
+    name: Dependency vulnerability audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate a temporary lockfile because the repository currently has none
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Audit direct and transitive dependencies
+        run: npm audit --audit-level=high
+
+      - name: Verify dependency tree consistency
+        run: |
+          npm ci --no-audit --no-fund
+          npm ls --all
+
   checks:
     name: Typecheck and deterministic tests
     runs-on: ubuntu-latest
