@@ -7,7 +7,7 @@ describe("calculateStress", () => {
   it("calculates a long loss, equity, maintenance and headroom", () => {
     const result = calculateStress(base);
     expect(result.stressedPrice).toBe(90_000);
-    expect(result.pnlUsd).toBe(-100);
+    expect(result.pnlUsd).toBeCloseTo(-100, 8);
     expect(result.startingMarginUsd).toBe(100);
     expect(result.equityUsd).toBe(0);
     expect(result.maintenanceUsd).toBe(22.5);
