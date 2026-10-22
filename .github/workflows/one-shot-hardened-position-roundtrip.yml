@@ -1,0 +1,47 @@
+name: One-shot hardened Hideki position round-trip
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perps-hardened-position-roundtrip
+  cancel-in-progress: false
+
+jobs:
+  funded-position-roundtrip:
+    if: contains(github.event.head_commit.message, '[RUN_HARDENED_POSITION_ROUNDTRIP]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out hardened main
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install SDK and project checks
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck before any transaction
+        run: npm run typecheck
+
+      - name: Run capped live Hideki position round-trip
+        env:
+          WALLET_KEY: ${{ secrets.wallet_key }}
+          CONFIRM_FUNDED_POSITION_E2E: YES
+        run: npm run testnet:position-roundtrip
+
+      - name: Upload redacted position lifecycle receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardened-hideki-position-roundtrip
+          path: artifacts/perps-stress-lab-position-roundtrip.json
+          if-no-files-found: warn
+          retention-days: 30
