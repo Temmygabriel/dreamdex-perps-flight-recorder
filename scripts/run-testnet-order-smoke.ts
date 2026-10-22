@@ -4,7 +4,6 @@ import {
   SOMNIA_HIDEKI_TESTNET_ADDRESSES,
   SomniaMarkets,
   decodePlaceOrder,
-  contractErrorsAbi,
 } from "@somnia-chain/markets-sdk";
 import { hidekiTestnet } from "@somnia-chain/markets-sdk/chains";
 import {
@@ -23,24 +22,24 @@ const RPC_URL = "https://api.hideki2.infra.testnet.somnia.network";
 const INDEXER_URL = process.env.HIDEKI_INDEXER_URL ?? "https://hideki-dev.smk.somnia.host/v1/graphql";
 const WS_RPC_URL = "wss://api.hideki2.infra.testnet.somnia.network/ws";
 const TARGET_NOTIONAL_USDSO = 12;
+const MIN_NOTIONAL_USDSO = 10;
 const MAX_NOTIONAL_USDSO = 15;
-const PLACE_SELECTOR = "0x80054449" as const;
-const CANCEL_SELECTOR = "0xe37b444b" as const;
+const TOPUP_USDSO = "1.5";
 const GAS_LIMIT = 10_000_000n;
 
-const poolAbi = [
-  ...parseAbi([
-    "function placeOrder(bool isBid, uint64 userData, uint256 price, uint256 quantity, uint64 expireTimestampNs, uint8 orderType, uint8 selfMatchingOption, address builder, uint96 builderFeeBpsTimes1k) payable returns (bool success, uint128 orderId)",
-    "function cancelOrder(uint128 orderId)",
-  ]),
-  ...contractErrorsAbi,
-] as const;
+const poolAbi = parseAbi([
+  "function placeOrder(bool isBid, uint64 userData, uint256 price, uint256 quantity, uint64 expireTimestampNs, uint8 orderType, uint8 selfMatchingOption, address builder, uint96 builderFeeBpsTimes1k) payable returns (bool success, uint128 orderId)",
+  "function cancelOrder(uint128 orderId)",
+]);
+const erc20Abi = parseAbi([
+  "function balanceOf(address owner) view returns (uint256)",
+]);
 
 function asBigInt(value: unknown, label: string): bigint {
   try {
     return typeof value === "bigint" ? value : BigInt(String(value));
   } catch {
-    throw new Error(`Market returned an invalid ${label}.`);
+    throw new Error("Market returned an invalid " + label + ".");
   }
 }
 function alignDown(value: bigint, step: bigint): bigint {
@@ -57,94 +56,78 @@ function wait(ms: number): Promise<void> {
 function stringify(value: unknown): string {
   return JSON.stringify(value, (_key, item) => typeof item === "bigint" ? item.toString() : item, 2);
 }
-
-function extractRevertSelector(error: unknown): string | null {
-  const queue: unknown[] = [error];
-  const seen = new Set<unknown>();
-  for (let depth = 0; queue.length && depth < 80; depth += 1) {
-    const current = queue.shift();
-    if (!current || seen.has(current)) continue;
-    if (typeof current === "string") {
-      const matches = current.match(/0x[0-9a-fA-F]{8,}/g);
-      if (matches?.length) {
-        const known = matches.find((value) => value.slice(0, 10).toLowerCase() === "0x3e31dcc2");
-        return (known ?? matches[0]).slice(0, 10).toLowerCase();
-      }
-      continue;
-    }
-    if (typeof current !== "object") continue;
-    seen.add(current);
-    const record = current as Record<string, unknown>;
-    for (const key of ["data", "cause", "error", "details", "shortMessage", "message", "raw", "metaMessages"]) {
-      if (key in record) queue.push(record[key]);
+function txHash(result: unknown): string | null {
+  if (typeof result === "string" && /^0x[0-9a-fA-F]{64}$/.test(result)) return result;
+  if (result && typeof result === "object") {
+    const row = result as Record<string, unknown>;
+    for (const value of [row.hash, row.transactionHash, (row.receipt as Record<string, unknown> | undefined)?.transactionHash]) {
+      if (typeof value === "string" && /^0x[0-9a-fA-F]{64}$/.test(value)) return value;
     }
   }
   return null;
 }
-
-async function preflightVoucherClaim(
-  publicClient: ReturnType<typeof createPublicClient>,
-  distributor: `0x${string}`,
-  account: ReturnType<typeof privateKeyToAccount>,
-): Promise<void> {
-  try {
-    await publicClient.simulateContract({
-      address: distributor,
-      abi: parseAbi(["function claim()"]),
-      functionName: "claim",
-      account,
-      gas: 1_000_000n,
-    });
-  } catch (error) {
-    const selector = extractRevertSelector(error);
-    if (selector === "0x3e31dcc2") {
-      throw new Error(
-        "Known Hideki VoucherDistributor blocker: read-only eth_call of claim() reverted with 0x3e31dcc2, despite SDK eligibility=true. " +
-        "No transaction was broadcast. This is a contract-side/SDK-preflight mismatch; an operator must fix the distributor configuration or issue the paper-USDso credit before order E2E can continue.",
-      );
-    }
-    throw new Error(
-      `VoucherDistributor read-only claim preflight reverted${selector ? ` with ${selector}` : " with an undecoded error"}. ` +
-      "No transaction was broadcast; investigate this result before trying the SDK claim.",
-    );
+function summaryMargin(value: unknown): unknown {
+  if (!value || typeof value !== "object") return value;
+  const row = value as Record<string, unknown>;
+  const preferred = [
+    "balance", "freeBalance", "lockedBalance", "equity", "withdrawable", "activePools",
+    "freeCollateral", "lockedCollateral", "imReq", "mmReq", "cmReq", "marginStatus",
+  ];
+  const summary: Record<string, unknown> = {};
+  for (const key of preferred) {
+    if (key in row) summary[key] = row[key];
   }
+  return Object.keys(summary).length ? summary : row;
 }
 
 async function main(): Promise<void> {
   if (process.env.CONFIRM_LIVE_TEST_ORDER !== "YES") {
-    throw new Error("Safety stop: set the manual workflow confirmation to YES before any transaction can be sent.");
+    throw new Error("Safety stop: this workflow must explicitly set CONFIRM_LIVE_TEST_ORDER=YES.");
   }
   const rawKey = process.env.WALLET_KEY?.trim();
-  if (!rawKey) throw new Error("Missing Actions secret wallet_key.");
-  const privateKey = (rawKey.startsWith("0x") ? rawKey : `0x${rawKey}`) as Hex;
+  if (!rawKey) throw new Error("Missing GitHub Actions secret wallet_key.");
+  const privateKey = (rawKey.startsWith("0x") ? rawKey : "0x" + rawKey) as Hex;
   if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
     throw new Error("wallet_key must be a 32-byte EVM private key. The value was not printed.");
   }
 
   const account = privateKeyToAccount(privateKey);
-  const side = process.env.SMOKE_SIDE === "short" ? "short" : "long";
-  const isBid = side === "long";
-  const exchange = new SomniaMarkets({
+  const exchange: any = new SomniaMarkets({
     chain: hidekiTestnet,
     indexerUrl: INDEXER_URL,
     wsRpcUrl: WS_RPC_URL,
     addresses: SOMNIA_HIDEKI_TESTNET_ADDRESSES,
     privateKey,
   } as never);
-  const publicClient = createPublicClient({ chain: hidekiTestnet, transport: http(RPC_URL, { timeout: 20_000 }) });
-  const walletClient = createWalletClient({ account, chain: hidekiTestnet, transport: http(RPC_URL, { timeout: 20_000 }) });
+  const publicClient = createPublicClient({
+    chain: hidekiTestnet,
+    transport: http(RPC_URL, { timeout: 20_000 }),
+  });
+  const walletClient = createWalletClient({
+    account,
+    chain: hidekiTestnet,
+    transport: http(RPC_URL, { timeout: 20_000 }),
+  });
 
-  let claimTxHash: string | null = null;
-  let placementTxHash: string | null = null;
-  let cancellationTxHash: string | null = null;
-  let orderIdText: string | null = null;
-  let orderVisibleAfterPlacement = false;
-  let orderAbsentAfterCancellation = false;
-  let filledCount = 0;
+  let side = process.env.SMOKE_SIDE === "short" ? "short" : "long";
+  const isBid = side === "long";
   let marketSymbol = "BTC-PERP";
+  let marginBank: `0x${string}` | null = null;
+  let collateralToken: `0x${string}` | null = null;
+  let walletCollateralBefore: string | null = null;
+  let walletCollateralAfter: string | null = null;
+  let marginBefore: unknown = null;
+  let marginAfter: unknown = null;
+  let depositTransaction: string | null = null;
+  let placementTransaction: string | null = null;
+  let cancellationTransaction: string | null = null;
+  let orderIdText: string | null = null;
   let orderPrice = "";
   let orderQuantity = "";
   let actualNotional = 0;
+  let filledCount = 0;
+  let orderVisibleAfterPlacement = false;
+  let orderAbsentAfterCancellation = false;
   let failure: string | null = null;
   let poolAddress: `0x${string}` | null = null;
 
@@ -153,12 +136,16 @@ async function main(): Promise<void> {
 
   try {
     const chainId = await publicClient.getChainId();
-    if (chainId !== 50383) throw new Error(`Safety stop: expected Hideki chain 50383, received ${chainId}.`);
+    if (chainId !== 50383) throw new Error("Safety stop: expected Hideki chain 50383, got " + chainId + ".");
+    if (typeof exchange.trader.depositMargin !== "function") {
+      throw new Error("Installed SDK does not expose trader.depositMargin; stopping before transactions.");
+    }
 
-    const rows = await exchange.client.listPerpMarkets() as any[];
-    const market = rows.find((row) => String(row.baseSymbol).toUpperCase() === "BTC");
-    if (!market) throw new Error("BTC Perps market was not returned. No transaction was sent.");
+    const perps = await exchange.client.listPerpMarkets() as any[];
+    const market = perps.find((row) => String(row.baseSymbol).toUpperCase() === "BTC");
+    if (!market) throw new Error("BTC Perps market not returned by the chain SDK.");
     poolAddress = market.poolAddress as `0x${string}`;
+    marginBank = market.marginBank as `0x${string}`;
     const baseDecimals = Number(market.baseDecimals);
     const quoteDecimals = Number(market.quoteDecimals);
     const tickSize = asBigInt(market.tickSize, "tick size");
@@ -166,158 +153,196 @@ async function main(): Promise<void> {
     const minQuantity = asBigInt(market.minQuantity, "minimum quantity");
     marketSymbol = "BTC-PERP";
 
-    const eligibility = await exchange.client.getPerpVoucherEligibility(market.marginBank, account.address);
-    if (eligibility.eligible) {
-      const campaign = await exchange.client.getPerpVoucherCampaign(market.marginBank);
-      if (!campaign) throw new Error("Voucher eligibility was true but no live campaign was resolved; stopping before any transaction.");
-      const voucherState = await exchange.client.getPerpVoucher(market.marginBank, account.address);
-      if (voucherState?.claimed) throw new Error("The current account is already marked as having claimed this voucher; stopping before any transaction.");
-      console.log("Perps voucher is eligible according to the SDK. Preflighting the distributor's claim() with read-only eth_call before allowing any write.");
-      console.log("Using the exact distributor resolved from the live campaign; the account remains on Hideki testnet.");
-      await preflightVoucherClaim(publicClient, campaign.distributor as `0x${string}`, account);
-      console.log("Voucher claim preflight passed. Only now may the explicitly confirmed SDK claim be attempted.");
-      let claimResult;
-      try {
-        claimResult = await exchange.trader.claimPerpVoucher({ distributor: campaign.distributor });
-      } catch (claimError) {
-        const safeDetails: Record<string, unknown> = {};
-        let current: any = claimError;
-        for (let depth = 0; depth < 4 && current; depth += 1) {
-          for (const key of ["name", "message", "shortMessage", "code", "data", "transactionHash", "hash"]) {
-            const value = current[key];
-            if ((typeof value === "string" || typeof value === "number") && value !== "") {
-              safeDetails[`cause${depth}_${key}`] = value;
-            }
-          }
-          current = current.cause;
-        }
-        console.error("Voucher claim structured error (no key material):", stringify(safeDetails));
-        throw claimError;
-      }
-      const possibleHash = typeof claimResult === "string"
-        ? claimResult
-        : (claimResult as { transactionHash?: string; hash?: string } | null)?.transactionHash
-          ?? (claimResult as { hash?: string } | null)?.hash;
-      if (possibleHash) claimTxHash = possibleHash;
-      await wait(2_500);
-    } else {
-      console.log("Voucher is not eligible; continuing only if the SDK confirms sufficient existing Perps collateral.");
+    const systemConfig = await exchange.client.getPerpSystemConfig(marginBank);
+    collateralToken = String(systemConfig?.collateral ?? market.quoteToken ?? "") as `0x${string}`;
+    if (!/^0x[0-9a-fA-F]{40}$/.test(collateralToken)) {
+      throw new Error("Could not resolve collateral token from the live Perps system config. No transaction was sent.");
     }
 
-    const unifiedMarkets = await exchange.loadMarkets();
-    const sdkMarket = Object.values(unifiedMarkets).find((row: any) =>
+    const tokenBalance = await publicClient.readContract({
+      address: collateralToken,
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [account.address],
+    });
+    walletCollateralBefore = formatUnits(tokenBalance, quoteDecimals);
+    marginBefore = typeof exchange.client.getMarginAccount === "function"
+      ? await exchange.client.getMarginAccount(marginBank, account.address)
+      : { note: "Installed SDK does not expose getMarginAccount; order-size preflight remains authoritative." };
+
+    const sdkMarkets = await exchange.loadMarkets();
+    const sdkMarket = Object.values(sdkMarkets).find((row: any) =>
       row.type === "swap" &&
       String(row.base ?? row.info?.baseSymbol ?? "").toUpperCase() === "BTC" &&
       String(row.quote ?? row.info?.quoteSymbol ?? "").toUpperCase() === String(market.quoteSymbol).toUpperCase()
     ) as any;
-    if (!sdkMarket?.symbol) throw new Error("The SDK did not resolve BTC Perps to a readable order book.");
-    // Use the SDK-resolved symbol for order read-back. The raw market row may
-    // not share the exchange adapter unified symbol format.
+    if (!sdkMarket?.symbol) throw new Error("SDK did not resolve a BTC Perps order book.");
     marketSymbol = String(sdkMarket.symbol);
 
-    const book = await exchange.fetchOrderBook(sdkMarket.symbol, 1);
-    const top = Number(isBid ? book.bids?.[0]?.[0] : book.asks?.[0]?.[0]);
-    if (!Number.isFinite(top) || top <= 0) throw new Error("The BTC order book has no valid top quote. No order was sent.");
+    const openBefore = await exchange.fetchOpenOrders(marketSymbol);
+    if (Array.isArray(openBefore) && openBefore.length > 0) {
+      throw new Error("Safety stop: this wallet already has open orders on " + marketSymbol + ". No duplicate order or deposit was attempted.");
+    }
 
-    const rawTop = parseUnits(String(top), quoteDecimals);
+    const book = await exchange.fetchOrderBook(marketSymbol, 1);
+    const topValue = Number(isBid ? book.bids?.[0]?.[0] : book.asks?.[0]?.[0]);
+    if (!Number.isFinite(topValue) || topValue <= 0) throw new Error("BTC book lacks a valid top quote.");
+    const rawTop = parseUnits(topValue.toFixed(Math.min(quoteDecimals, 8)), quoteDecimals);
     const targetPrice = isBid ? (rawTop * 9_990n) / 10_000n : (rawTop * 10_010n) / 10_000n;
     const price = isBid ? alignDown(targetPrice, tickSize) : alignUp(targetPrice, tickSize);
-    if (price <= 0n) throw new Error("Computed post-only limit price is invalid.");
+    if (price <= 0n) throw new Error("Computed POST_ONLY order price is invalid.");
 
-    const targetNotional = parseUnits(String(TARGET_NOTIONAL_USDSO), quoteDecimals);
-    const wantedQuantity = (targetNotional * (10n ** BigInt(baseDecimals))) / price;
-    let quantity = alignDown(wantedQuantity, lotSize);
-    if (quantity < minQuantity) quantity = minQuantity;
-
-    const max = await exchange.client.getMaxPerpOrderSize({
-      pool: market.poolAddress,
-      marginBank: market.marginBank,
+    const checkSize = async () => await exchange.client.getMaxPerpOrderSize({
+      pool: poolAddress,
+      marginBank,
       account: account.address,
       isBid,
       price,
     });
-    if (!max.priceable) throw new Error("The market mark is stale/unpriceable. No order was sent.");
-    if (!max.placeable) throw new Error(`The protocol still blocks placement: ${String(max.limitedBy)}. No order was sent.`);
-    const maxQuantity = asBigInt(max.maxQuantity, "maximum order size");
-    if (quantity > maxQuantity) quantity = alignDown(maxQuantity, lotSize);
-    if (quantity < minQuantity) throw new Error("The account's allowed size is below the market minimum. No order was sent.");
-
-    const notionalRaw = (quantity * price) / (10n ** BigInt(baseDecimals));
-    actualNotional = Number(formatUnits(notionalRaw, quoteDecimals));
-    if (!Number.isFinite(actualNotional) || actualNotional < 10 || actualNotional > MAX_NOTIONAL_USDSO) {
-      throw new Error(`Safety stop: computed notional ${actualNotional.toFixed(4)} USDso is outside the fixed 10–${MAX_NOTIONAL_USDSO} USDso range. No order was sent.`);
+    let max = await checkSize();
+    if (!max.priceable) {
+      throw new Error("The protocol mark is stale/unpriceable. Refusing to deposit or submit an order.");
     }
+
+    const wantedQuantity = (parseUnits(String(TARGET_NOTIONAL_USDSO), quoteDecimals) * (10n ** BigInt(baseDecimals))) / price;
+    let quantity = alignDown(wantedQuantity, lotSize);
+    if (quantity < minQuantity) quantity = minQuantity;
+    const calcNotional = (q: bigint) => Number(formatUnits((q * price) / (10n ** BigInt(baseDecimals)), quoteDecimals));
+    actualNotional = calcNotional(quantity);
+    if (!Number.isFinite(actualNotional) || actualNotional < MIN_NOTIONAL_USDSO || actualNotional > MAX_NOTIONAL_USDSO) {
+      throw new Error("Safety stop: minimum- and lot-aligned order notional " + actualNotional.toFixed(4) +
+        " USDso is outside the fixed " + MIN_NOTIONAL_USDSO + "–" + MAX_NOTIONAL_USDSO + " cap.");
+    }
+
+    if ((!max.placeable || quantity > asBigInt(max.maxQuantity, "maximum order size")) && String(max.limitedBy) === "collateral") {
+      const topUp = parseUnits(TOPUP_USDSO, quoteDecimals);
+      const available = await publicClient.readContract({
+        address: collateralToken,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [account.address],
+      });
+      if (available < topUp) {
+        throw new Error("Perps margin is insufficient and the wallet's existing USDso collateral balance (" +
+          walletCollateralBefore + ") is below the small " + TOPUP_USDSO +
+          " USDso top-up needed for this minimum-size test order. No transaction was sent.");
+      }
+      console.log("The order-size gate says collateral, so using existing wallet USDso to fund Perps margin.");
+      console.log("Wallet USDso before: " + walletCollateralBefore);
+      console.log("Depositing only " + TOPUP_USDSO + " USDso into the Perps MarginBank; the voucher claim is skipped.");
+      const deposited = await exchange.trader.depositMargin({
+        marginBank,
+        collateral: collateralToken,
+        amount: topUp,
+        autoApprove: true,
+        gas: GAS_LIMIT,
+      });
+      depositTransaction = txHash(deposited);
+      await wait(1_500);
+      marginAfter = typeof exchange.client.getMarginAccount === "function"
+        ? await exchange.client.getMarginAccount(marginBank, account.address)
+        : { note: "SDK getMarginAccount not available; using order-size preflight." };
+      const afterWallet = await publicClient.readContract({
+        address: collateralToken,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [account.address],
+      });
+      walletCollateralAfter = formatUnits(afterWallet, quoteDecimals);
+      max = await checkSize();
+      console.log("Deposit transaction: " + (depositTransaction ?? "SDK result did not expose a transaction hash"));
+      console.log("Wallet USDso after: " + walletCollateralAfter);
+      console.log("Margin account after deposit: " + stringify(summaryMargin(marginAfter)));
+      console.log("Order-size gate after deposit: " + stringify({
+        priceable: max.priceable,
+        placeable: max.placeable,
+        maxQuantity: max.maxQuantity,
+        limitedBy: max.limitedBy,
+      }));
+    } else {
+      walletCollateralAfter = walletCollateralBefore;
+      marginAfter = marginBefore;
+    }
+
+    if (!max.priceable) throw new Error("Mark-price preflight failed after funding.");
+    if (!max.placeable || quantity > asBigInt(max.maxQuantity, "maximum order size")) {
+      throw new Error("Protocol still refuses the bounded order after funding: limitedBy=" +
+        String(max.limitedBy) + ", maxQuantity=" + String(max.maxQuantity) + ".");
+    }
+
+    const openExpiryNs = BigInt(Math.floor(Date.now() / 1000) + 60 * 60) * 1_000_000_000n;
     orderPrice = formatUnits(price, quoteDecimals);
     orderQuantity = formatUnits(quantity, baseDecimals);
+    console.log("FUNDED PERPS TESTNET ORDER LIFECYCLE");
+    console.log("Network: Somnia Hideki testnet (chain 50383)");
+    console.log("Account: " + account.address);
+    console.log("Market / side: " + marketSymbol + " / " + side);
+    console.log("Spot USDso balance before funding Perps: " + walletCollateralBefore);
+    console.log("Limit price: " + orderPrice);
+    console.log("Quantity: " + orderQuantity);
+    console.log("Hard-capped notional: " + actualNotional.toFixed(4) + " paper USDso (max 15).");
 
-    console.log("LIVE TESTNET ORDER LIFECYCLE");
-    console.log("Network: Somnia Hideki testnet (chain ID 50383)");
-    console.log(`Account: ${account.address}`);
-    console.log(`Market / side: ${marketSymbol} / ${side}`);
-    console.log("Order type: POST_ONLY limit; price is set 0.1% away from the current top of book.");
-    console.log(`Limit price: ${orderPrice} USDso`);
-    console.log(`Quantity: ${orderQuantity} BTC`);
-    console.log(`Hard-capped notional: ${actualNotional.toFixed(4)} paper USDso (maximum ${MAX_NOTIONAL_USDSO}).`);
-
-    const expiryNs = BigInt(Math.floor(Date.now() / 1000) + 50 * 365 * 24 * 60 * 60) * 1_000_000_000n;
     const { request } = await publicClient.simulateContract({
       address: poolAddress,
       abi: poolAbi,
       functionName: "placeOrder",
-      args: [isBid, 0n, price, quantity, expiryNs, ORDER_TYPE.POST_ONLY, 0, zeroAddress, 0n],
+      args: [isBid, 0n, price, quantity, openExpiryNs, ORDER_TYPE.POST_ONLY, 0, zeroAddress, 0n],
       account,
       gas: GAS_LIMIT,
     });
     const orderHash = await walletClient.writeContract(request as never);
-    placementTxHash = orderHash;
+    placementTransaction = orderHash;
     const orderReceipt = await publicClient.waitForTransactionReceipt({ hash: orderHash });
-    if (orderReceipt.status !== "success") throw new Error(`Order transaction reverted: ${orderHash}`);
-
+    if (orderReceipt.status !== "success") throw new Error("Order transaction reverted: " + orderHash);
     const decoded = decodePlaceOrder(orderReceipt, poolAddress);
     orderIdText = decoded.orderId === undefined ? null : String(decoded.orderId);
     filledCount = (decoded.fills ?? []).length;
-    if (!orderIdText) throw new Error(`Order transaction succeeded but no order ID could be decoded. Inspect transaction ${orderHash} before retrying.`);
-    if (filledCount > 0) throw new Error(`Safety alert: POST_ONLY reported ${filledCount} fill(s). Inspect the position before doing anything else.`);
+    if (!orderIdText) throw new Error("Order succeeded but the order ID did not decode; inspect " + orderHash + ".");
 
-    for (let attempt = 0; attempt < 8; attempt += 1) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
       const open = await exchange.fetchOpenOrders(marketSymbol);
-      orderVisibleAfterPlacement = open.some((order: any) => String(order.id) === orderIdText);
+      orderVisibleAfterPlacement = open.some((row: any) => String(row.id) === orderIdText);
       if (orderVisibleAfterPlacement) break;
-      await wait(1_500);
+      await wait(1_200);
     }
 
-    const { request: cancelRequest } = await publicClient.simulateContract({
-      address: poolAddress,
-      abi: poolAbi,
-      functionName: "cancelOrder",
-      args: [BigInt(orderIdText)],
-      account,
-      gas: GAS_LIMIT,
-    });
-    const cancelHash = await walletClient.writeContract(cancelRequest as never);
-    cancellationTxHash = cancelHash;
-    const cancelReceipt = await publicClient.waitForTransactionReceipt({ hash: cancelHash });
-    if (cancelReceipt.status !== "success") throw new Error(`Cancellation reverted; inspect the account's open orders now. Transaction: ${cancelHash}`);
+    if (filledCount === 0) {
+      const { request: cancelRequest } = await publicClient.simulateContract({
+        address: poolAddress,
+        abi: poolAbi,
+        functionName: "cancelOrder",
+        args: [BigInt(orderIdText)],
+        account,
+        gas: GAS_LIMIT,
+      });
+      const cancelHash = await walletClient.writeContract(cancelRequest as never);
+      cancellationTransaction = cancelHash;
+      const cancelReceipt = await publicClient.waitForTransactionReceipt({ hash: cancelHash });
+      if (cancelReceipt.status !== "success") throw new Error("Cancellation transaction reverted: " + cancelHash);
+    } else {
+      throw new Error("Safety alert: the POST_ONLY receipt contains " + filledCount + " fill(s). Position/order state needs review.");
+    }
 
-    for (let attempt = 0; attempt < 8; attempt += 1) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
       const open = await exchange.fetchOpenOrders(marketSymbol);
-      orderAbsentAfterCancellation = !open.some((order: any) => String(order.id) === orderIdText);
+      orderAbsentAfterCancellation = !open.some((row: any) => String(row.id) === orderIdText);
       if (orderAbsentAfterCancellation) break;
-      await wait(1_500);
+      await wait(1_200);
     }
     if (!orderVisibleAfterPlacement || !orderAbsentAfterCancellation) {
-      throw new Error("Transactions succeeded but indexer read-back did not prove both order visibility and cancellation.");
+      throw new Error("Transactions landed but the indexer did not prove order visibility and cancellation.");
     }
-    console.log(`Placement transaction: ${placementTxHash}`);
-    console.log(`Cancellation transaction: ${cancellationTxHash}`);
-    console.log("Order visible after placement: true");
-    console.log("Order absent after cancellation: true");
-    console.log("LIVE ORDER SMOKE TEST PASSED.");
+    console.log("Placement transaction: " + placementTransaction);
+    console.log("Cancellation transaction: " + cancellationTransaction);
+    console.log("Order ID: " + orderIdText);
+    console.log("Visible after placement: true; absent after cancellation: true; fills: 0.");
+    console.log("FUNDED PERPS ORDER E2E PASSED.");
   } catch (error) {
     failure = error instanceof Error ? error.message : "Unknown failure";
-    if (placementTxHash && orderIdText && !cancellationTxHash && poolAddress) {
+    console.error("FUNDED PERPS E2E FAILED:", failure);
+    if (placementTransaction && orderIdText && !cancellationTransaction && poolAddress) {
       try {
-        const { request } = await publicClient.simulateContract({
+        const { request: cancelRequest } = await publicClient.simulateContract({
           address: poolAddress,
           abi: poolAbi,
           functionName: "cancelOrder",
@@ -325,11 +350,17 @@ async function main(): Promise<void> {
           account,
           gas: GAS_LIMIT,
         });
-        const hash = await walletClient.writeContract(request as never);
-        const receipt = await publicClient.waitForTransactionReceipt({ hash });
-        if (receipt.status === "success") cancellationTxHash = hash;
+        const cleanupHash = await walletClient.writeContract(cancelRequest as never);
+        const cleanupReceipt = await publicClient.waitForTransactionReceipt({ hash: cleanupHash });
+        if (cleanupReceipt.status === "success") {
+          cancellationTransaction = cleanupHash;
+          console.error("Safety cleanup submitted successfully; cancellation tx:", cleanupHash);
+        } else {
+          console.error("URGENT: safety-cleanup cancellation receipt reverted:", cleanupHash);
+        }
       } catch (cleanupError) {
-        console.error("EMERGENCY CANCEL FAILED. Inspect the BTC Perps account's open orders immediately:", cleanupError instanceof Error ? cleanupError.message : "unknown cleanup error");
+        console.error("URGENT: could not auto-cancel the test order. Inspect the wallet's BTC Perps open orders. Reason:",
+          cleanupError instanceof Error ? cleanupError.message : "unknown cleanup error");
       }
     }
     throw error;
@@ -341,31 +372,39 @@ async function main(): Promise<void> {
       account: account.address,
       market: marketSymbol,
       side,
-      orderType: "POST_ONLY",
+      collateral: {
+        token: collateralToken,
+        walletBalanceBefore: walletCollateralBefore,
+        walletBalanceAfter: walletCollateralAfter,
+        marginBefore: summaryMargin(marginBefore),
+        marginAfter: summaryMargin(marginAfter),
+        intendedTopUpUsdso: TOPUP_USDSO,
+        depositTransaction,
+      },
       targetNotionalUsdso: TARGET_NOTIONAL_USDSO,
+      minNotionalUsdso: MIN_NOTIONAL_USDSO,
       maxNotionalUsdso: MAX_NOTIONAL_USDSO,
       orderPrice: orderPrice || null,
       orderQuantity: orderQuantity || null,
       actualNotionalUsdso: actualNotional || null,
-      voucherClaimTransaction: claimTxHash,
-      placementTransaction: placementTxHash,
-      cancellationTransaction: cancellationTxHash,
+      placementTransaction,
+      cancellationTransaction,
       orderId: orderIdText,
       filledCount,
       verification: {
         orderVisibleAfterPlacement,
         orderAbsentAfterCancellation,
-        verified: Boolean(placementTxHash && cancellationTxHash && orderIdText && filledCount === 0 && orderVisibleAfterPlacement && orderAbsentAfterCancellation && !failure),
+        verified: Boolean(placementTransaction && cancellationTransaction && orderIdText && filledCount === 0 && orderVisibleAfterPlacement && orderAbsentAfterCancellation && !failure),
       },
       error: failure,
-      note: "Testnet only. Paper USDso is not real money. No private key is written to this receipt.",
+      note: "Hideki testnet only. Paper USDso is not real money. Only the private key configured as GitHub Actions wallet_key was used; the key is never printed or stored in the receipt.",
     };
     writeFileSync(receiptPath, stringify(receipt) + "\n", { mode: 0o600 });
-    try { await exchange.close?.(); } catch { /* Preserve the receipt. */ }
+    try { await exchange.close?.(); } catch { /* Preserve receipt. */ }
   }
 }
 
 main().catch((error: unknown) => {
-  console.error("TESTNET ORDER SMOKE FAILED:", error instanceof Error ? error.message : "Unknown error");
+  console.error("FUNDED PERPS E2E TERMINATED:", error instanceof Error ? error.message : "Unknown failure");
   process.exitCode = 1;
 });

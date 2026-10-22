@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm_live_order:
-        description: "YES authorizes a paper-USDso voucher claim if eligible, then one capped POST_ONLY order and cancellation on Hideki testnet."
+        description: "YES authorizes using existing wallet USDso (and at most a fixed 1.5 USDso Perps-margin top-up if collateral is the only gate), then one capped POST_ONLY order and cancellation on Hideki testnet."
         required: true
         type: choice
         options:
@@ -37,7 +37,7 @@ jobs:
         run: echo "No transaction sent. Re-run manually and select YES only when authorizing the bounded Hideki testnet order lifecycle with the configured wallet_key secret."
 
   testnet-order:
-    name: Claim voucher if eligible, place and cancel one capped order
+    name: Use existing USDso, place and cancel one capped order
     if: inputs.confirm_live_order == 'YES'
     runs-on: ubuntu-latest
     timeout-minutes: 12
