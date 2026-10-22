@@ -1,0 +1,49 @@
+name: One-shot funded Hideki Perps position round-trip
+
+on:
+  push:
+    branches:
+      - ops/funded-position-roundtrip
+
+permissions:
+  contents: read
+
+concurrency:
+  group: one-shot-funded-hideki-position-roundtrip
+  cancel-in-progress: false
+
+jobs:
+  position-roundtrip:
+    if: contains(github.event.head_commit.message, '[RUN_FUNDED_POSITION_E2E]')
+    name: Deposit existing USDso, open BTC position, close it and verify flat
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out temporary one-shot branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install SDK and project checks
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck before any transaction
+        run: npm run typecheck
+
+      - name: Move 5 USDso into Perps, open and close one capped BTC position
+        env:
+          WALLET_KEY: ${{ secrets.wallet_key }}
+          CONFIRM_FUNDED_POSITION_E2E: "YES"
+        run: npx tsx scripts/run-funded-position-roundtrip.ts
+
+      - name: Upload redacted position lifecycle receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: funded-hideki-position-roundtrip
+          path: artifacts/perps-stress-lab-position-roundtrip.json
+          if-no-files-found: warn
+          retention-days: 30
