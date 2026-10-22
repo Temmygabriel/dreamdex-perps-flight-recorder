@@ -24,28 +24,40 @@ async function getJson(path) {
 }
 
 async function probeRoot() {
-  try {
-    const response = await fetch(base, {
-      headers: { accept: "text/html" },
-      cache: "no-store",
-      signal: AbortSignal.timeout(8_000),
-    });
-    const html = await response.text();
-    const result = {
-      status: response.status,
-      finalUrl: response.url,
-      stressLabBranding: html.includes("Perps Stress Lab"),
-      contentType: response.headers.get("content-type") ?? "unknown",
-      headers: Object.fromEntries(response.headers.entries()),
-      html,
-    };
-    console.log(`Deployment root probe: HTTP ${result.status}; Stress Lab branding: ${result.stressLabBranding}; content type: ${result.contentType}`);
-    return result;
-  } catch (error) {
-    const result = { status: 0, finalUrl: base, stressLabBranding: false, contentType: "unavailable", headers: {}, html: "" };
-    console.log("Deployment root probe failed:", error instanceof Error ? error.message : "unknown error");
-    return result;
+  let result = { status: 0, finalUrl: base, stressLabBranding: false, contentType: "unavailable", headers: {}, html: "" };
+  for (let attempt = 1; attempt <= 8; attempt++) {
+    try {
+      const response = await fetch(base, {
+        headers: { accept: "text/html" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(8_000),
+      });
+      const html = await response.text();
+      result = {
+        status: response.status,
+        finalUrl: response.url,
+        stressLabBranding: html.includes("Perps Stress Lab"),
+        contentType: response.headers.get("content-type") ?? "unknown",
+        headers: Object.fromEntries(response.headers.entries()),
+        html,
+      };
+      const rootReady = result.status === 200 && result.stressLabBranding;
+      const securityPolicyReady = Boolean(result.headers["content-security-policy"]);
+      if (rootReady && securityPolicyReady) {
+        console.log(`Deployment root probe: HTTP ${result.status}; Stress Lab branding: ${result.stressLabBranding}; content type: ${result.contentType}`);
+        return result;
+      }
+      if (attempt < 8) {
+        console.log(`Deployment root not fully propagated yet (attempt ${attempt}/8; HTTP ${result.status}; branding ${result.stressLabBranding}; CSP ${securityPolicyReady ? "present" : "missing"}). Retrying in 4 seconds.`);
+      }
+    } catch (error) {
+      result = { status: 0, finalUrl: base, stressLabBranding: false, contentType: "unavailable", headers: {}, html: "" };
+      console.log(`Deployment root probe attempt ${attempt}/8 failed: ${error instanceof Error ? error.message : "unknown error"}`);
+    }
+    if (attempt < 8) await wait(4_000);
   }
+  console.log(`Deployment root probe exhausted retries: HTTP ${result.status}; Stress Lab branding: ${result.stressLabBranding}; content type: ${result.contentType}; CSP ${result.headers["content-security-policy"] ? "present" : "missing"}.`);
+  return result;
 }
 
 async function main() {
