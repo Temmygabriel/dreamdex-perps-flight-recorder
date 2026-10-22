@@ -82,7 +82,7 @@ function update(){
   setText("scenario-status",lastRunAt?"SCENARIO REVIEWED":"LIVE PREVIEW");
   setText("report-meta","Local estimate · "+new Date(s.createdAt).toLocaleTimeString());
   setText("funding-note",s.funding.enabled?"Assumes "+fmt(s.funding.rate8hPercent,3)+"% per 8h period for "+s.funding.periods+" full periods, applied to entry notional.":"Funding is off. Turn it on to model an explicit constant-rate assumption.");
-  document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.classList.toggle("selected",Number(b.dataset.shock)===shock));
+  document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>{const selected=Number(b.dataset.shock)===shock;b.classList.toggle("selected",selected);b.setAttribute("aria-pressed",String(selected));});
  }catch(e){
   latest=null;
   lastRunAt=null;
@@ -204,7 +204,7 @@ $("theme-toggle").addEventListener("click", () => {
   applyTheme(next, true);
 });
 
-document.querySelectorAll<HTMLButtonElement>("[data-side]").forEach(b=>b.addEventListener("click",()=>{lastRunAt=null;side=b.dataset.side as Side;document.querySelectorAll("[data-side]").forEach(x=>x.classList.toggle("active",x===b));update();}));
+document.querySelectorAll<HTMLButtonElement>("[data-side]").forEach(b=>b.addEventListener("click",()=>{lastRunAt=null;side=b.dataset.side as Side;document.querySelectorAll<HTMLButtonElement>("[data-side]").forEach(x=>{const selected=x===b;x.classList.toggle("active",selected);x.setAttribute("aria-pressed",String(selected));});update();}));
 document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.addEventListener("click",()=>{lastRunAt=null; $<HTMLInputElement>("shock").value=b.dataset.shock!;update();}));
 ["entry","quantity","maintenance","starting-margin","shock","funding-rate","funding-periods","market"].forEach(id=>$<HTMLInputElement | HTMLSelectElement>(id).addEventListener("input",()=>{
  lastRunAt=null;
