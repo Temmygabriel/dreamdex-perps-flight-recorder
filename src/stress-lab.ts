@@ -113,14 +113,17 @@ async function copySummary(){
 async function loadMarketPrice(symbol:string){
  const requestId=++marketPriceRequestId;
  try{
-  const response=await fetch("/api/market-price?symbol="+encodeURIComponent(symbol),{headers:{accept:"application/json"},cache:"no-store"});
+  const response=await fetch("/api/market-price?symbol="+encodeURIComponent(symbol),{headers:{accept:"application/json"},cache:"no-store",signal:AbortSignal.timeout(10000)});
   if(!response.ok)throw new Error("Order-book endpoint returned HTTP "+response.status);
   const payload=await response.json() as {ok?:boolean;referencePrice?:number;bestBid?:number;bestAsk?:number;priceSource?:string;timestamp?:string};
-  if(!payload.ok||!Number.isFinite(payload.referencePrice)||Number(payload.referencePrice)<=0)throw new Error("No valid reference price was returned.");
-  if(requestId!==marketPriceRequestId||val("market")!==symbol)return;
   const midpoint=Number(payload.referencePrice);
+  const bestBid=Number(payload.bestBid),bestAsk=Number(payload.bestAsk);
+  const quoteTimestamp=Date.parse(payload.timestamp??"");
+  const expectedMidpoint=(bestBid+bestAsk)/2;
+  if(!payload.ok||!Number.isFinite(midpoint)||midpoint<=0||!Number.isFinite(bestBid)||bestBid<=0||!Number.isFinite(bestAsk)||bestAsk<bestBid||!Number.isFinite(expectedMidpoint)||Math.abs(midpoint-expectedMidpoint)>Math.max(1e-8,Math.abs(midpoint)*1e-8)||!Number.isFinite(quoteTimestamp)||Math.abs(Date.now()-quoteTimestamp)>5*60*1000)throw new Error("The order-book response was invalid, inconsistent, or stale.");
+  if(requestId!==marketPriceRequestId||val("market")!==symbol)return;
   // Keep the latest book quote as provenance, even when the user chose a manual entry.
-  priceReference={source:payload.priceSource??"Top-of-book midpoint; not the protocol mark price.",timestamp:payload.timestamp??null,bestBid:Number(payload.bestBid),bestAsk:Number(payload.bestAsk)};
+  priceReference={source:payload.priceSource??"Top-of-book midpoint; not the protocol mark price.",timestamp:payload.timestamp??null,bestBid,bestAsk};
   if(entryWasManuallyEdited){
    entryPriceSource="manual-input";
    setText("market-hint","Manual entry retained · live book midpoint "+usd(midpoint)+" available, not a mark price.");
@@ -149,7 +152,7 @@ async function loadMarketPrice(symbol:string){
 async function loadMarkets(){
  const status=$("data-status");status.innerHTML='<span class="status-dot muted"></span> Checking market data…';
  try{
-  const response=await fetch("/api/markets",{headers:{accept:"application/json"},cache:"no-store"});
+  const response=await fetch("/api/markets",{headers:{accept:"application/json"},cache:"no-store",signal:AbortSignal.timeout(10000)});
   if(!response.ok)throw new Error("Market endpoint returned HTTP "+response.status);
   const payload:unknown=await response.json();
   const root=payload as {markets?:unknown;data?:unknown;result?:unknown};
@@ -207,7 +210,11 @@ document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.addEve
  lastRunAt=null;
  if(id==="starting-margin"){
   const percent=num("starting-margin");const leverage=$<HTMLSelectElement>("leverage");const choices=[2,5,10,20];
-  leverage.value=String(choices.reduce((best,current)=>Math.abs(100/current-percent)<Math.abs(100/best-percent)?current:best,choices[0]));
+  const exactChoice=choices.find((candidate)=>Math.abs(100/candidate-percent)<0.001);
+  let custom=leverage.querySelector<HTMLOptionElement>('option[value="custom"]');
+  if(!custom){custom=document.createElement("option");custom.value="custom";custom.disabled=true;leverage.append(custom);}
+  if(exactChoice!==undefined)leverage.value=String(exactChoice);
+  else{custom.textContent="Custom · "+fmt(100/percent,1)+"×";leverage.value="custom";}
  }
  if(id==="entry"){
   entryWasManuallyEdited=true;
@@ -225,7 +232,7 @@ document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.addEve
  if(id==="market")void loadMarketPrice(val("market"));
 }));
 $("funding-toggle").addEventListener("change",()=>{lastRunAt=null;const enabled=$<HTMLInputElement>("funding-toggle").checked; $("funding-fields").setAttribute("aria-disabled",String(!enabled));$<HTMLInputElement>("funding-rate").disabled=!enabled;$<HTMLSelectElement>("funding-periods").disabled=!enabled;update();});
-$<HTMLSelectElement>("leverage").addEventListener("change",()=>{lastRunAt=null;$<HTMLInputElement>("starting-margin").value=String(100/num("leverage"));update();});
+$<HTMLSelectElement>("leverage").addEventListener("change",()=>{if(val("leverage")==="custom")return;lastRunAt=null;$<HTMLInputElement>("starting-margin").value=String(100/num("leverage"));update();});
 $("run-scenario").addEventListener("click",markRun);
 $("export-json").addEventListener("click",download);
 $("copy-summary").addEventListener("click",()=>void copySummary());
