@@ -119,6 +119,7 @@ async function main(): Promise<void> {
   let depositVerified = false;
   let positionOpened = false;
   let positionClosed = false;
+  let entryAttempted = false;
   let cleanupAttempted = false;
   let cleanupVerified = false;
   let failure: string | null = null;
@@ -187,6 +188,7 @@ async function main(): Promise<void> {
     submittedNotional = notional;
     console.log("Opening one Hideki BTC long MARKET order with a " + ENTRY_SLIPPAGE_BPS +
       " bps price guard; notional capped at 15 paper USDso.");
+    entryAttempted = true;
     const result = await exchange.trader.placePerpOrder({
       pool: poolAddress, isBid: true, price: crossedLimit, quantity,
       orderType: ORDER_TYPE.MARKET, gas: GAS_LIMIT,
@@ -377,20 +379,22 @@ async function main(): Promise<void> {
   } catch (error) {
     failure = error instanceof Error ? error.message : "Unknown failure";
     console.error("FUNDED POSITION ROUNDTRIP FAILED:", failure);
-    try {
-      const remaining = await currentBtcPosition();
-      if (remaining && Number(remaining.contracts ?? 0) > 0) {
+    if (entryAttempted) {
+      try {
+        const remaining = await currentBtcPosition();
+        if (remaining && Number(remaining.contracts ?? 0) > 0) {
+          cleanupAttempted = true;
+          console.error("Emergency cleanup: trying to close the BTC position opened in this run.");
+          cleanupVerified = await closeCurrentBtcPosition();
+        } else {
+          cleanupVerified = true;
+        }
+      } catch (cleanupError) {
         cleanupAttempted = true;
-        console.error("Emergency cleanup: trying to close the BTC position opened in this run.");
-        cleanupVerified = await closeCurrentBtcPosition();
-      } else {
-        cleanupVerified = true;
+        cleanupVerified = false;
+        console.error("URGENT: could not verify or close a remaining BTC position. Inspect the testnet account immediately:",
+          cleanupError instanceof Error ? cleanupError.message : "unknown cleanup error");
       }
-    } catch (cleanupError) {
-      cleanupAttempted = true;
-      cleanupVerified = false;
-      console.error("URGENT: could not verify or close a remaining BTC position. Inspect the testnet account immediately:",
-        cleanupError instanceof Error ? cleanupError.message : "unknown cleanup error");
     }
   } finally {
     try {
@@ -399,8 +403,8 @@ async function main(): Promise<void> {
         marginFinal = marginSummary(await currentMargin());
         const remaining = await currentBtcPosition();
         positionAfterClose = positionSummary(remaining);
-        positionClosed = !remaining || !(Number(remaining.contracts ?? 0) > 0);
-        if (!positionClosed && !cleanupAttempted) {
+        if (entryAttempted) positionClosed = !remaining || !(Number(remaining.contracts ?? 0) > 0);
+        if (entryAttempted && !positionClosed && !cleanupAttempted) {
           cleanupAttempted = true;
           cleanupVerified = await closeCurrentBtcPosition();
           const afterCleanup = await currentBtcPosition();
