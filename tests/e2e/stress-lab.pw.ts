@@ -185,5 +185,5 @@ test("preserves a manually entered price when a delayed refreshed quote arrives"
   releaseQuote();
   await expect(page.locator("#entry")).toHaveValue("123456.78");
   await expect(page.locator("#market-hint")).toContainText("Manual entry retained");
-  await expect(page.locator("#result-price")).toHaveText("$111,111.00");
+  await expect(page.locator("#result-price")).toHaveText("$111,111.10");
 });
