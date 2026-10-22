@@ -1,0 +1,75 @@
+name: One-shot funded Hideki Perps E2E
+
+on:
+  push:
+    branches:
+      - ops/run-perps-e2e-once
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: one-shot-funded-hideki-perps-e2e
+  cancel-in-progress: false
+
+jobs:
+  funded-perps-e2e:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[RUN_PERPS_E2E_ONE_SHOT]')
+    name: Use existing wallet collateral, place and cancel capped BTC order
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out one-shot diagnostic branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install SDK and checks
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck before any transaction
+        run: npm run typecheck
+
+      - name: Use existing wallet USDso; top up Perps margin only if required; place and cancel one capped POST_ONLY order
+        env:
+          WALLET_KEY: ${{ secrets.wallet_key }}
+          CONFIRM_FUNDED_PERPS_E2E: "YES"
+          PERPS_E2E_SIDE: "long"
+        run: npx tsx scripts/run-funded-perps-e2e.ts
+
+      - name: Upload redacted E2E receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: funded-hideki-perps-e2e-receipt
+          path: artifacts/perps-stress-lab-funded-order-e2e.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Publish redacted result for automated review (optional)
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'artifacts/perps-stress-lab-funded-order-e2e.json';
+            let body = '### One-shot Hideki Perps E2E result\\n\\nRun: ' + process.env.RUN_URL + '\\n';
+            if (fs.existsSync(path)) {
+              const receipt = JSON.parse(fs.readFileSync(path, 'utf8'));
+              body += '\\n```json\\n' + JSON.stringify(receipt, null, 2) + '\\n```';
+            } else {
+              body += '\\nNo receipt was produced (the job may have stopped at install/typecheck). Inspect the run log.';
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 4,
+              body,
+            });
