@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm_position_test:
-        description: "YES authorizes a 5 USDso transfer from the configured wallet into Perps, one BTC long MARKET position capped at 15 USDso, and an immediate close on Hideki testnet."
+        description: "YES authorizes a 5 USDso top-up only if unlocked Perps margin is below 5, one BTC long MARKET position capped at 15 USDso, and immediate close on Hideki testnet."
         required: true
         type: choice
         options:
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Confirm that no transaction will be sent
-        run: echo "No transaction sent. Select YES only to transfer 5 paper USDso to Perps, open one capped BTC position, and close it on Hideki testnet."
+        run: echo "No transaction sent. Select YES to top up Perps by 5 paper USDso only if unlocked margin is below 5, open one capped BTC position, and close it on Hideki testnet."
 
   position-roundtrip:
     name: Deposit existing USDso, open BTC position, close it and verify flat
@@ -48,7 +48,7 @@ jobs:
       - name: Typecheck before any transaction
         run: npm run typecheck
 
-      - name: Deposit 5 USDso to Perps, open and close one capped BTC position
+      - name: Ensure Perps margin is sufficient, open and close one capped BTC position
         env:
           WALLET_KEY: ${{ secrets.wallet_key }}
           CONFIRM_FUNDED_POSITION_E2E: ${{ inputs.confirm_position_test }}
