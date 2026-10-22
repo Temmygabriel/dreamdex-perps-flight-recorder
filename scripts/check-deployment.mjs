@@ -36,12 +36,13 @@ async function probeRoot() {
       finalUrl: response.url,
       stressLabBranding: html.includes("Perps Stress Lab"),
       contentType: response.headers.get("content-type") ?? "unknown",
+      headers: Object.fromEntries(response.headers.entries()),
       html,
     };
     console.log(`Deployment root probe: HTTP ${result.status}; Stress Lab branding: ${result.stressLabBranding}; content type: ${result.contentType}`);
     return result;
   } catch (error) {
-    const result = { status: 0, finalUrl: base, stressLabBranding: false, contentType: "unavailable", html: "" };
+    const result = { status: 0, finalUrl: base, stressLabBranding: false, contentType: "unavailable", headers: {}, html: "" };
     console.log("Deployment root probe failed:", error instanceof Error ? error.message : "unknown error");
     return result;
   }
@@ -50,6 +51,23 @@ async function probeRoot() {
 async function main() {
   const rootProbe = await probeRoot();
   if (rootProbe.status === 200 && rootProbe.stressLabBranding) {
+    const requiredHeaders = [
+      ["content-security-policy", "Content-Security-Policy"],
+      ["x-content-type-options", "X-Content-Type-Options"],
+      ["x-frame-options", "X-Frame-Options"],
+      ["referrer-policy", "Referrer-Policy"],
+      ["permissions-policy", "Permissions-Policy"],
+      ["strict-transport-security", "Strict-Transport-Security"],
+    ];
+    for (const [key, label] of requiredHeaders) {
+      if (!rootProbe.headers?.[key]) throw new Error(`Production root is missing the expected ${label} security header.`);
+    }
+    const csp = rootProbe.headers["content-security-policy"];
+    if (!csp.includes("script-src 'self'") || !csp.includes("frame-ancestors 'none'") || !csp.includes("object-src 'none'")) {
+      throw new Error("Production Content-Security-Policy is missing an expected script/frame/object restriction.");
+    }
+    console.log("Production security-header probe passed: CSP, nosniff, frame protection, referrer policy, permissions policy and HSTS.");
+
     const cssHref = rootProbe.html.match(/href=["']([^"']+\.css(?:\?[^"']*)?)["']/i)?.[1];
     if (!cssHref) throw new Error("Production HTML did not reference a bundled stylesheet; the UI may render unstyled.");
     const cssResponse = await fetch(new URL(cssHref, base), {

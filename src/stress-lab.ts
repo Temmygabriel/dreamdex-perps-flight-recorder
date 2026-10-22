@@ -12,6 +12,8 @@ let markets:MarketRecord[] = [];
 let latest:Scenario | null = null;
 let lastRunAt:string | null = null;
 let entryPriceSource: "manual-input" | "live-order-book-midpoint" = "manual-input";
+let entryWasManuallyEdited = false;
+let marketPriceRequestId = 0;
 let priceReference: {source:string;timestamp:string|null;bestBid:number|null;bestAsk:number|null} = {source:"manual input",timestamp:null,bestBid:null,bestAsk:null};
 
 function num(id:string):number { return Number($<HTMLInputElement | HTMLSelectElement>(id).value); }
@@ -45,7 +47,12 @@ function compute(){
 }
 function update(){
  try{
+  const wasInvalid = document.documentElement.dataset.scenarioState === "invalid";
   const s=compute(); latest=s;
+  delete document.documentElement.dataset.scenarioState;
+  $<HTMLButtonElement>("export-json").disabled=false;
+  $<HTMLButtonElement>("copy-summary").disabled=false;
+  if (wasInvalid) setText("export-feedback", "");
   const shock=num("shock");
   setText("margin-label",fmt(s.startingMarginPercent,0)+"% of notional");
   setText("shock-label",pct(shock)); $("shock-label").style.color=shock<0?"var(--red)":shock>0?"var(--green)":"var(--text)";
@@ -75,34 +82,69 @@ function update(){
   setText("scenario-status",lastRunAt?"SCENARIO REVIEWED":"LIVE PREVIEW");
   setText("report-meta","Local estimate · "+new Date(s.createdAt).toLocaleTimeString());
   setText("funding-note",s.funding.enabled?"Assumes "+fmt(s.funding.rate8hPercent,3)+"% per 8h period for "+s.funding.periods+" full periods, applied to entry notional.":"Funding is off. Turn it on to model an explicit constant-rate assumption.");
-  document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.classList.toggle("selected",Number(b.dataset.shock)===shock));
- }catch(e){setText("scenario-status","CHECK INPUTS");setText("export-feedback",e instanceof Error?e.message:"Please check your inputs.");}
+  document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>{const selected=Number(b.dataset.shock)===shock;b.classList.toggle("selected",selected);b.setAttribute("aria-pressed",String(selected));});
+ }catch(e){
+  latest=null;
+  lastRunAt=null;
+  document.documentElement.dataset.scenarioState="invalid";
+  $<HTMLButtonElement>("export-json").disabled=true;
+  $<HTMLButtonElement>("copy-summary").disabled=true;
+  for (const id of ["result-price","price-change","result-pnl","pnl-percent","result-equity","result-headroom","headroom-sub","trace-price","trace-price-value","trace-pnl","trace-pnl-value","trace-equity","trace-equity-value","trace-maint","trace-maint-value","bar-equity-label","bar-maint-label"]) setText(id,"—");
+  $("result-pnl").className="";
+  $("result-equity").className="";
+  $("result-headroom").className="";
+  $("equity-bar").style.width="0%";
+  $("maintenance-bar").style.width="0%";
+  const threshold=$("threshold-note");
+  threshold.classList.add("warning");
+  threshold.querySelector("strong")!.textContent="Results unavailable";
+  threshold.querySelector("p")!.textContent="Correct the scenario inputs before reviewing or exporting results.";
+  setText("scenario-status","CHECK INPUTS");
+  setText("export-feedback",e instanceof Error?e.message:"Please check your inputs.");
 }
-function markRun(){lastRunAt=new Date().toISOString();update();setText("scenario-status","SCENARIO REVIEWED");$("results").scrollIntoView({behavior:"smooth",block:"start"});}
+}
+function markRun(){lastRunAt=null;update();if(!latest)return;lastRunAt=new Date().toISOString();setText("scenario-status","SCENARIO REVIEWED");$("results").scrollIntoView({behavior:"smooth",block:"start"});}
 function download(){
- try{const s=compute();latest=s;const report={...s,generatedAt:new Date().toISOString(),verification:{onChain:false,liveAccountDataUsed:false,transactionHash:null},disclaimer:"This is a local scenario estimate, not on-chain evidence, financial advice, an official liquidation price, or a prediction of protocol liquidation behavior."};const blob=new Blob([JSON.stringify(report,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="perps-stress-lab-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";a.click();URL.revokeObjectURL(url);setText("export-feedback","Scenario JSON exported. It is labelled as local, non-on-chain evidence.");}catch(e){setText("export-feedback",e instanceof Error?e.message:"Unable to export this scenario.");}
+ try{const s=compute();latest=s;const report={...s,generatedAt:new Date().toISOString(),verification:{onChain:false,liveAccountDataUsed:false,transactionHash:null},disclaimer:"This is a local scenario estimate, not on-chain evidence, financial advice, an official liquidation price, or a prediction of protocol liquidation behavior."};const blob=new Blob([JSON.stringify(report,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="perps-stress-lab-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);setText("export-feedback","Scenario JSON exported. It is labelled as local, non-on-chain evidence.");}catch(e){setText("export-feedback",e instanceof Error?e.message:"Unable to export this scenario.");}
 }
 async function copySummary(){
  try{const s=compute();const summary=["PERPS STRESS LAB — SCENARIO SUMMARY","Network: Somnia Hideki testnet (50383)","Source: "+s.source+"; not on-chain evidence","Market: "+s.market,"Direction: "+s.side.toUpperCase(),"Entry: "+usd(s.entryPrice),"Quantity: "+fmt(s.quantity,8),"Shock: "+pct(s.shockPercent),"Stressed price: "+usd(s.stressedPrice),"Estimated P&L: "+usd(s.pnlUsd),"Estimated equity: "+usd(s.equityUsd),"Maintenance estimate: "+usd(s.maintenanceUsd),"Headroom: "+usd(s.headroomUsd),"Funding estimate: "+usd(s.funding.estimatedUsd),"","This simplified isolated-position estimate excludes fees, other positions, full protocol accounting and liquidation execution."].join("\n");await navigator.clipboard.writeText(summary);setText("export-feedback","Readable scenario summary copied.");}catch{setText("export-feedback","Clipboard access failed. Use Export scenario JSON instead.");}
 }
 async function loadMarketPrice(symbol:string){
+ const requestId=++marketPriceRequestId;
  try{
-  const response=await fetch("/api/market-price?symbol="+encodeURIComponent(symbol),{headers:{accept:"application/json"},cache:"no-store"});
+  const response=await fetch("/api/market-price?symbol="+encodeURIComponent(symbol),{headers:{accept:"application/json"},cache:"no-store",signal:AbortSignal.timeout(10000)});
   if(!response.ok)throw new Error("Order-book endpoint returned HTTP "+response.status);
   const payload=await response.json() as {ok?:boolean;referencePrice?:number;bestBid?:number;bestAsk?:number;priceSource?:string;timestamp?:string};
-  if(!payload.ok||!Number.isFinite(payload.referencePrice)||Number(payload.referencePrice)<=0)throw new Error("No valid reference price was returned.");
-  if(val("market")!==symbol)return;
-  $<HTMLInputElement>("entry").value=String(payload.referencePrice);
-  entryPriceSource="live-order-book-midpoint";
-  priceReference={source:payload.priceSource??"Top-of-book midpoint",timestamp:payload.timestamp??null,bestBid:Number(payload.bestBid),bestAsk:Number(payload.bestAsk)};
-  setText("market-hint","Live book midpoint "+usd(Number(payload.referencePrice))+" · not a mark price. Entry remains editable.");
-  setText("method-data","Read-only Hideki order book returned a two-sided quote for "+symbol+". The entry field is prefilled with its bid/ask midpoint; calculations do not use live account margin.");
+  const midpoint=Number(payload.referencePrice);
+  const bestBid=Number(payload.bestBid),bestAsk=Number(payload.bestAsk);
+  const quoteTimestamp=Date.parse(payload.timestamp??"");
+  const expectedMidpoint=(bestBid+bestAsk)/2;
+  if(!payload.ok||!Number.isFinite(midpoint)||midpoint<=0||!Number.isFinite(bestBid)||bestBid<=0||!Number.isFinite(bestAsk)||bestAsk<bestBid||!Number.isFinite(expectedMidpoint)||Math.abs(midpoint-expectedMidpoint)>Math.max(1e-8,Math.abs(midpoint)*1e-8)||!Number.isFinite(quoteTimestamp)||Math.abs(Date.now()-quoteTimestamp)>5*60*1000)throw new Error("The order-book response was invalid, inconsistent, or stale.");
+  if(requestId!==marketPriceRequestId||val("market")!==symbol)return;
+  // Keep the latest book quote as provenance, even when the user chose a manual entry.
+  priceReference={source:payload.priceSource??"Top-of-book midpoint; not the protocol mark price.",timestamp:payload.timestamp??null,bestBid,bestAsk};
+  if(entryWasManuallyEdited){
+   entryPriceSource="manual-input";
+   setText("market-hint","Manual entry retained · live book midpoint "+usd(midpoint)+" available, not a mark price.");
+   setText("method-data","A read-only Hideki book quote was fetched for "+symbol+". Your manually entered entry price was preserved; the quote is reference context only and calculations do not use live account margin.");
+  }else{
+   $<HTMLInputElement>("entry").value=String(midpoint);
+   entryPriceSource="live-order-book-midpoint";
+   setText("market-hint","Live book midpoint "+usd(midpoint)+" · not a mark price. Entry remains editable.");
+   setText("method-data","Read-only Hideki order book returned a two-sided quote for "+symbol+". The entry field is prefilled with its bid/ask midpoint; calculations do not use live account margin.");
+  }
   update();
  }catch(e){
-  if(val("market")!==symbol)return;
-  entryPriceSource="manual-input";
-  priceReference={source:"manual input; live book midpoint unavailable",timestamp:null,bestBid:null,bestAsk:null};
-  setText("market-hint","Live reference price unavailable; enter an entry price manually.");
+  if(requestId!==marketPriceRequestId||val("market")!==symbol)return;
+  if(!entryWasManuallyEdited){
+   entryPriceSource="manual-input";
+   priceReference={source:"manual input; live book midpoint unavailable",timestamp:null,bestBid:null,bestAsk:null};
+   setText("market-hint","Live reference price unavailable; enter an entry price manually.");
+  }else{
+   entryPriceSource="manual-input";
+   setText("market-hint","Live reference price unavailable; your manual entry is retained.");
+  }
   setText("method-data","Could not load a live order-book midpoint: "+(e instanceof Error?e.message:"unknown error")+". The manual scenario remains available.");
   update();
  }
@@ -110,7 +152,7 @@ async function loadMarketPrice(symbol:string){
 async function loadMarkets(){
  const status=$("data-status");status.innerHTML='<span class="status-dot muted"></span> Checking market data…';
  try{
-  const response=await fetch("/api/markets",{headers:{accept:"application/json"},cache:"no-store"});
+  const response=await fetch("/api/markets",{headers:{accept:"application/json"},cache:"no-store",signal:AbortSignal.timeout(10000)});
   if(!response.ok)throw new Error("Market endpoint returned HTTP "+response.status);
   const payload:unknown=await response.json();
   const root=payload as {markets?:unknown;data?:unknown;result?:unknown};
@@ -162,11 +204,35 @@ $("theme-toggle").addEventListener("click", () => {
   applyTheme(next, true);
 });
 
-document.querySelectorAll<HTMLButtonElement>("[data-side]").forEach(b=>b.addEventListener("click",()=>{lastRunAt=null;side=b.dataset.side as Side;document.querySelectorAll("[data-side]").forEach(x=>x.classList.toggle("active",x===b));update();}));
+document.querySelectorAll<HTMLButtonElement>("[data-side]").forEach(b=>b.addEventListener("click",()=>{lastRunAt=null;side=b.dataset.side as Side;document.querySelectorAll<HTMLButtonElement>("[data-side]").forEach(x=>{const selected=x===b;x.classList.toggle("active",selected);x.setAttribute("aria-pressed",String(selected));});update();}));
 document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.addEventListener("click",()=>{lastRunAt=null; $<HTMLInputElement>("shock").value=b.dataset.shock!;update();}));
-["entry","quantity","maintenance","starting-margin","shock","funding-rate","funding-periods","market"].forEach(id=>$<HTMLInputElement | HTMLSelectElement>(id).addEventListener("input",()=>{lastRunAt=null;if(id==="starting-margin"){const percent=num("starting-margin");const leverage=$<HTMLSelectElement>("leverage");const choices=[2,5,10,20];leverage.value=String(choices.reduce((best,current)=>Math.abs(100/current-percent)<Math.abs(100/best-percent)?current:best,choices[0]));}if(id==="entry"){entryPriceSource="manual-input";priceReference={source:"manual input",timestamp:null,bestBid:null,bestAsk:null};}update();if(id==="market")void loadMarketPrice(val("market"));}));
+["entry","quantity","maintenance","starting-margin","shock","funding-rate","funding-periods","market"].forEach(id=>$<HTMLInputElement | HTMLSelectElement>(id).addEventListener("input",()=>{
+ lastRunAt=null;
+ if(id==="starting-margin"){
+  const percent=num("starting-margin");const leverage=$<HTMLSelectElement>("leverage");const choices=[2,5,10,20];
+  const exactChoice=choices.find((candidate)=>Math.abs(100/candidate-percent)<0.001);
+  let custom=leverage.querySelector<HTMLOptionElement>('option[value="custom"]');
+  if(!custom){custom=document.createElement("option");custom.value="custom";custom.disabled=true;leverage.append(custom);}
+  if(exactChoice!==undefined)leverage.value=String(exactChoice);
+  else{custom.textContent="Custom · "+fmt(100/percent,1)+"×";leverage.value="custom";}
+ }
+ if(id==="entry"){
+  entryWasManuallyEdited=true;
+  entryPriceSource="manual-input";
+  if(!priceReference.timestamp)priceReference={source:"manual input; live book midpoint unavailable",timestamp:null,bestBid:null,bestAsk:null};
+ }
+ if(id==="market"){
+  // A quote for the newly selected market must not reuse an old asset's entry price.
+  entryWasManuallyEdited=false;
+  $<HTMLInputElement>("entry").value="";
+  entryPriceSource="manual-input";
+  priceReference={source:"waiting for selected market quote",timestamp:null,bestBid:null,bestAsk:null};
+ }
+ update();
+ if(id==="market")void loadMarketPrice(val("market"));
+}));
 $("funding-toggle").addEventListener("change",()=>{lastRunAt=null;const enabled=$<HTMLInputElement>("funding-toggle").checked; $("funding-fields").setAttribute("aria-disabled",String(!enabled));$<HTMLInputElement>("funding-rate").disabled=!enabled;$<HTMLSelectElement>("funding-periods").disabled=!enabled;update();});
-$<HTMLSelectElement>("leverage").addEventListener("change",()=>{lastRunAt=null;$<HTMLInputElement>("starting-margin").value=String(100/num("leverage"));update();});
+$<HTMLSelectElement>("leverage").addEventListener("change",()=>{if(val("leverage")==="custom")return;lastRunAt=null;$<HTMLInputElement>("starting-margin").value=String(100/num("leverage"));update();});
 $("run-scenario").addEventListener("click",markRun);
 $("export-json").addEventListener("click",download);
 $("copy-summary").addEventListener("click",()=>void copySummary());

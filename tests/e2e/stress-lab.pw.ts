@@ -144,3 +144,77 @@ test("switches between light and dim mode and keeps the selected theme after rel
   await expect(root).toHaveAttribute("data-theme", "light");
   await expect(page.locator("#theme-toggle-label")).toHaveText("Dim mode");
 });
+
+
+test("invalid input clears stale results and cannot be marked reviewed or exported", async ({ page }) => {
+  await page.locator("#run-scenario").click();
+  await expect(page.locator("#scenario-status")).toHaveText("SCENARIO REVIEWED");
+  await page.locator("#entry").fill("");
+  await expect(page.locator("#scenario-status")).toHaveText("CHECK INPUTS");
+  await expect(page.locator("#result-pnl")).toHaveText("—");
+  await expect(page.locator("#result-price")).toHaveText("—");
+  await expect(page.locator("#export-json")).toBeDisabled();
+  await expect(page.locator("#copy-summary")).toBeDisabled();
+  await page.locator("#run-scenario").click();
+  await expect(page.locator("#scenario-status")).toHaveText("CHECK INPUTS");
+  await expect(page.locator("#result-pnl")).toHaveText("—");
+  await page.locator("#entry").fill("100000");
+  await expect(page.locator("#result-pnl")).toHaveText("−$100.00");
+  await expect(page.locator("#export-json")).toBeEnabled();
+  await page.locator("#run-scenario").click();
+  await expect(page.locator("#scenario-status")).toHaveText("SCENARIO REVIEWED");
+});
+
+test("preserves a manually entered price when a delayed refreshed quote arrives", async ({ page }) => {
+  let startQuote!: () => void;
+  let releaseQuote!: () => void;
+  const quoteStarted = new Promise<void>((resolve) => { startQuote = resolve; });
+  const quoteGate = new Promise<void>((resolve) => { releaseQuote = resolve; });
+  await page.route("**/api/market-price?**", async (route) => {
+    startQuote();
+    await quoteGate;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ...pricePayload, referencePrice: 111111, bestBid: 111000, bestAsk: 111222 }),
+    });
+  });
+  await page.locator("#refresh-data").click();
+  await quoteStarted;
+  await page.locator("#entry").fill("123456.78");
+  releaseQuote();
+  await expect(page.locator("#entry")).toHaveValue("123456.78");
+  await expect(page.locator("#market-hint")).toContainText("Manual entry retained");
+  await expect(page.locator("#result-price")).toHaveText("$111,111.10");
+});
+
+
+test("shows custom leverage instead of a misleading nearest preset", async ({ page }) => {
+  await page.locator("#starting-margin").evaluate((el: HTMLInputElement) => {
+    el.value = "11";
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(page.locator("#margin-label")).toHaveText("11% of notional");
+  await expect(page.locator("#leverage")).toHaveValue("custom");
+  await expect(page.locator("#leverage option[value='custom']")).toHaveText("Custom · 9.1×");
+  await page.locator("#leverage").selectOption("5");
+  await expect(page.locator("#starting-margin")).toHaveValue("20");
+  await expect(page.locator("#margin-label")).toHaveText("20% of notional");
+});
+
+
+test("exposes selected direction and shock presets to assistive technology", async ({ page }) => {
+  const long = page.locator('[data-side="long"]');
+  const short = page.locator('[data-side="short"]');
+  await expect(long).toHaveAttribute("aria-pressed", "true");
+  await expect(short).toHaveAttribute("aria-pressed", "false");
+  await short.click();
+  await expect(short).toHaveAttribute("aria-pressed", "true");
+  await expect(long).toHaveAttribute("aria-pressed", "false");
+  const severe = page.locator('[data-shock="-20"]');
+  const pullback = page.locator('[data-shock="-5"]');
+  await pullback.click();
+  await expect(pullback).toHaveAttribute("aria-pressed", "true");
+  await expect(severe).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#shock")).toHaveAttribute("aria-label", "Price shock percentage");
+});
