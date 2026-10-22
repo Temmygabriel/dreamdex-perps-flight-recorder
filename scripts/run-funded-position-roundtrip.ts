@@ -106,6 +106,7 @@ async function main(): Promise<void> {
   let marginAfterDeposit: Record<string, unknown> | null = null;
   let marginFinal: Record<string, unknown> | null = null;
   let depositHash: string | null = null;
+  let depositUsdsoApplied = "0";
   let entryHash: string | null = null;
   const exitHashes: string[] = [];
   let requestedQuantity: string | null = null;
@@ -311,48 +312,60 @@ async function main(): Promise<void> {
     if (Array.isArray(existingOrders) && existingOrders.length > 0) {
       throw new Error("Safety stop: BTC has " + existingOrders.length + " open orders. No deposit or position was attempted.");
     }
-    const depositAmount = parseUnits(DEPOSIT_USDSO, quoteDecimals);
-    if (tokenBefore < depositAmount) {
+    const requiredPerpsBuffer = parseUnits(DEPOSIT_USDSO, quoteDecimals);
+    const currentUnlocked = asBigInt(
+      startingMargin.unlockedCollateralBalance ?? startingMargin.equity ?? 0n,
+      "current unlocked Perps collateral",
+    );
+    const depositAmount = currentUnlocked < requiredPerpsBuffer ? requiredPerpsBuffer : 0n;
+    if (depositAmount > 0n && tokenBefore < depositAmount) {
       throw new Error("Wallet USDso is " + walletUsdsoBefore + ", below the fixed " + DEPOSIT_USDSO +
-        " USDso deposit. No transaction was sent.");
+        " USDso top-up needed because Perps margin is below 5 USDso. No transaction was sent.");
     }
 
     console.log("Hideki wallet: " + accountAddress + " | BTC market: " + marketSymbol);
     console.log("Wallet USDso before: " + walletUsdsoBefore);
     console.log("Perps margin before: " + json(marginBefore));
-    console.log("Moving exactly " + DEPOSIT_USDSO + " existing wallet USDso into Perps margin. No voucher claim.");
-    const depositResult = await exchange.trader.depositMargin({
-      marginBank, collateral: collateralToken, amount: depositAmount,
-      autoApprove: true, gas: GAS_LIMIT,
-    });
-    depositHash = txHash(depositResult);
-    console.log("Perps deposit transaction: " + (depositHash ?? "SDK did not return a recognized hash"));
+    if (depositAmount > 0n) {
+      console.log("Perps unlocked margin is below 5 USDso. Depositing exactly " + DEPOSIT_USDSO +
+        " from the existing wallet balance. Voucher claim is skipped.");
+      const depositResult = await exchange.trader.depositMargin({
+        marginBank, collateral: collateralToken, amount: depositAmount,
+        autoApprove: true, gas: GAS_LIMIT,
+      });
+      depositHash = txHash(depositResult);
+      depositUsdsoApplied = DEPOSIT_USDSO;
+      console.log("Perps deposit transaction: " + (depositHash ?? "SDK did not return a recognized deposit hash"));
+    } else {
+      console.log("Perps already has at least 5 USDso of unlocked margin. Skipping another transfer; no voucher claim.");
+    }
 
     const minimumEquity = asBigInt(startingMargin.equity ?? 0n, "starting margin equity") +
       depositAmount * 9_950n / 10_000n;
+    const expectedWalletDelta = depositAmount * 9_950n / 10_000n;
     let marginAfter: Record<string, unknown> | null = null;
     let tokenAfter = 0n;
-    for (let attempt = 0; attempt < 12; attempt += 1) {
-      await wait(1_000);
+    for (let attempt = 0; attempt < (depositAmount > 0n ? 12 : 1); attempt += 1) {
+      if (depositAmount > 0n) await wait(1_000);
       marginAfter = await currentMargin();
       tokenAfter = await readWalletUsdso(collateralToken);
-      const equity = asBigInt(marginAfter.equity ?? 0n, "post-deposit margin equity");
-      if (equity >= minimumEquity && tokenBefore - tokenAfter >= depositAmount * 9_950n / 10_000n) break;
+      const equity = asBigInt(marginAfter.equity ?? 0n, "post-funding margin equity");
+      if (equity >= minimumEquity && tokenBefore - tokenAfter >= expectedWalletDelta) break;
     }
-    if (!marginAfter) throw new Error("MarginBank read-back failed after deposit.");
+    if (!marginAfter) throw new Error("MarginBank read-back failed after funding check.");
     walletUsdsoAfterDeposit = formatUnits(tokenAfter, quoteDecimals);
     marginAfterDeposit = marginSummary(marginAfter);
-    const actualEquity = asBigInt(marginAfter.equity ?? 0n, "post-deposit margin equity");
+    const actualEquity = asBigInt(marginAfter.equity ?? 0n, "post-funding margin equity");
     if (actualEquity < minimumEquity) {
-      throw new Error("MarginBank equity did not rise by the deposit amount. Refusing to open a position.");
+      throw new Error("MarginBank equity did not confirm the required margin after funding. Refusing to open a position.");
     }
-    if (tokenBefore - tokenAfter < depositAmount * 9_950n / 10_000n) {
-      throw new Error("Wallet USDso balance did not confirm the transfer. Refusing to open a position.");
+    if (tokenBefore - tokenAfter < expectedWalletDelta) {
+      throw new Error("Wallet USDso balance did not confirm the expected transfer/read-back. Refusing to open a position.");
     }
     depositVerified = true;
-    console.log("USDso moved from wallet to Perps is intentionally left in Perps after the position closes; this run does not withdraw it back to Spot.");
-    console.log("Perps margin after deposit: " + json(marginAfterDeposit));
-    console.log("Wallet USDso after deposit: " + walletUsdsoAfterDeposit);
+    console.log("Any transferred USDso will remain in Perps after the position closes; this run does not withdraw it back to Spot.");
+    console.log("Perps margin after funding check: " + json(marginAfterDeposit));
+    console.log("Wallet USDso after funding check: " + walletUsdsoAfterDeposit);
 
     const initialBook = await exchange.fetchOrderBook(marketSymbol, 1);
     const initialAsk = Number(initialBook.asks?.[0]?.[0]);
@@ -430,7 +443,7 @@ async function main(): Promise<void> {
         walletUsdsoBefore,
         walletUsdsoAfterDeposit,
         walletUsdsoFinal,
-        depositUsdso: DEPOSIT_USDSO,
+        depositUsdso: depositUsdsoApplied,
         depositTransaction: depositHash,
         marginBefore,
         marginAfterDeposit,
