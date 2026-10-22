@@ -201,3 +201,20 @@ test("shows custom leverage instead of a misleading nearest preset", async ({ pa
   await expect(page.locator("#starting-margin")).toHaveValue("20");
   await expect(page.locator("#margin-label")).toHaveText("20% of notional");
 });
+
+
+test("exposes selected direction and shock presets to assistive technology", async ({ page }) => {
+  const long = page.locator('[data-side="long"]');
+  const short = page.locator('[data-side="short"]');
+  await expect(long).toHaveAttribute("aria-pressed", "true");
+  await expect(short).toHaveAttribute("aria-pressed", "false");
+  await short.click();
+  await expect(short).toHaveAttribute("aria-pressed", "true");
+  await expect(long).toHaveAttribute("aria-pressed", "false");
+  const severe = page.locator('[data-shock="-20"]');
+  const pullback = page.locator('[data-shock="-5"]');
+  await pullback.click();
+  await expect(pullback).toHaveAttribute("aria-pressed", "true");
+  await expect(severe).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#shock")).toHaveAttribute("aria-label", "Price shock percentage");
+});
