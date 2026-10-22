@@ -187,3 +187,17 @@ test("preserves a manually entered price when a delayed refreshed quote arrives"
   await expect(page.locator("#market-hint")).toContainText("Manual entry retained");
   await expect(page.locator("#result-price")).toHaveText("$111,111.10");
 });
+
+
+test("shows custom leverage instead of a misleading nearest preset", async ({ page }) => {
+  await page.locator("#starting-margin").evaluate((el: HTMLInputElement) => {
+    el.value = "11";
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(page.locator("#margin-label")).toHaveText("11% of notional");
+  await expect(page.locator("#leverage")).toHaveValue("custom");
+  await expect(page.locator("#leverage option[value='custom']")).toHaveText("Custom · 9.1×");
+  await page.locator("#leverage").selectOption("5");
+  await expect(page.locator("#starting-margin")).toHaveValue("20");
+  await expect(page.locator("#margin-label")).toHaveText("20% of notional");
+});
