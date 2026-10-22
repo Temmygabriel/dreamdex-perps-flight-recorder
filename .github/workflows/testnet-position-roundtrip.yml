@@ -1,0 +1,64 @@
+name: Perps Stress Lab funded testnet position round-trip
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_position_test:
+        description: "YES authorizes a 5 USDso top-up only if unlocked Perps margin is below 5, one BTC long MARKET position capped at 15 USDso, and immediate close on Hideki testnet."
+        required: true
+        type: choice
+        options:
+          - "NO"
+          - "YES"
+        default: "NO"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perps-funded-position-roundtrip
+  cancel-in-progress: false
+
+jobs:
+  safety-stop:
+    name: No transaction authorized
+    if: inputs.confirm_position_test != 'YES'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm that no transaction will be sent
+        run: echo "No transaction sent. Select YES to top up Perps by 5 paper USDso only if unlocked margin is below 5, open one capped BTC position, and close it on Hideki testnet."
+
+  position-roundtrip:
+    name: Deposit existing USDso, open BTC position, close it and verify flat
+    if: inputs.confirm_position_test == 'YES'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install SDK and project checks
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck before any transaction
+        run: npm run typecheck
+
+      - name: Ensure Perps margin is sufficient, open and close one capped BTC position
+        env:
+          WALLET_KEY: ${{ secrets.wallet_key }}
+          CONFIRM_FUNDED_POSITION_E2E: ${{ inputs.confirm_position_test }}
+        run: npm run testnet:position-roundtrip
+
+      - name: Upload redacted position lifecycle receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perps-funded-position-roundtrip
+          path: artifacts/perps-stress-lab-position-roundtrip.json
+          if-no-files-found: warn
+          retention-days: 30
