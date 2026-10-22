@@ -350,6 +350,7 @@ async function main(): Promise<void> {
       throw new Error("Wallet USDso balance did not confirm the transfer. Refusing to open a position.");
     }
     depositVerified = true;
+    console.log("USDso moved from wallet to Perps is intentionally left in Perps after the position closes; this run does not withdraw it back to Spot.");
     console.log("Perps margin after deposit: " + json(marginAfterDeposit));
     console.log("Wallet USDso after deposit: " + walletUsdsoAfterDeposit);
 
