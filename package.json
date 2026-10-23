@@ -15,7 +15,8 @@
     "test:e2e": "playwright test",
     "check:perps-readiness": "tsx scripts/check-perps-readiness.ts",
     "testnet:position-roundtrip": "tsx scripts/run-funded-position-roundtrip.ts",
-    "testnet:spot-withdrawal": "tsx scripts/run-spot-withdrawal-roundtrip.ts"
+    "testnet:spot-withdrawal": "tsx scripts/run-spot-withdrawal-roundtrip.ts",
+    "check:protocol-reference": "tsx scripts/verify-protocol-reference.ts"
   },
   "dependencies": {
     "@somnia-chain/markets-sdk": "0.32.1",
