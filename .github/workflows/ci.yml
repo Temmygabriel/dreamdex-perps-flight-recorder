@@ -90,7 +90,7 @@ jobs:
 
   testnet-read-only:
     name: Optional read-only testnet check
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'rebuild/perps-stress-lab')
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -110,6 +110,9 @@ jobs:
 
       - name: Check market minimums against live books (read-only)
         run: npx tsx scripts/inspect-market-minimums.ts
+
+      - name: Verify live MarginBank system wiring against published Hideki addresses
+        run: npm run check:protocol-reference
 
 
   test-wallet-read-only:

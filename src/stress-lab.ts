@@ -2,7 +2,7 @@ import "./app.css";
 import { calculateStress } from "./stress-model.js";
 type Side = "long" | "short";
 type MarketRecord = { symbol?: string; name?: string; baseSymbol?: string; quoteSymbol?: string; markPrice?: number|string; mark?: number|string; price?: number|string; minQuantity?: number|string; minSize?: number|string; tickSize?: number|string; lotSize?: number|string; maintenanceMarginRate?: number|string; maintenanceMargin?: number|string; [key:string]: unknown };
-type Scenario = { createdAt:string; product:"Perps Stress Lab"; version:"0.1.0"; network:{name:string;chainId:number}; source:"manual-input"|"live-order-book-midpoint"; priceReference:{source:string;timestamp:string|null;bestBid:number|null;bestAsk:number|null}; side:Side; market:string; entryPrice:number; quantity:number; leverage:number; startingMarginPercent:number; startingMarginUsd:number; shockPercent:number; stressedPrice:number; pnlUsd:number; funding:{enabled:boolean;rate8hPercent:number;periods:number;estimatedUsd:number;assumption:string}; equityUsd:number; maintenancePercent:number; maintenanceUsd:number; headroomUsd:number; thresholdStatus:"above-estimate"|"at-or-below-estimate"; assumptions:string[] };
+type Scenario = { createdAt:string; product:"Perps Stress Lab"; version:"0.1.0"; network:{name:string;chainId:number}; source:"manual-input"|"live-order-book-midpoint"; priceReference:{source:string;timestamp:string|null;bestBid:number|null;bestAsk:number|null}; side:Side; market:string; entryPrice:number; quantity:number; leverage:number; startingMarginPercent:number; startingMarginUsd:number; shockPercent:number; stressedPrice:number; pnlUsd:number; funding:{enabled:boolean;rate8hPercent:number;hourlySettlements:number;estimatedUsd:number;assumption:string}; equityUsd:number; maintenancePercent:number; maintenanceUsd:number; headroomUsd:number; thresholdStatus:"above-estimate"|"at-or-below-estimate"; assumptions:string[] };
 const $ = <T extends HTMLElement>(id:string) => document.getElementById(id) as T;
 const fmt = (n:number, digits=2) => Number.isFinite(n) ? new Intl.NumberFormat("en-US",{minimumFractionDigits:digits,maximumFractionDigits:digits}).format(n) : "—";
 const usd = (n:number) => (n < 0 ? "−$" : "$") + fmt(Math.abs(n));
@@ -39,11 +39,11 @@ function compute(){
     "Estimated equity = starting margin + directional unrealised P&L + optional simplified funding estimate.",
     "Maintenance requirement = quantity × stressed price × user-entered maintenance percentage.",
     "Fees, slippage, realised/unrealised accounting differences, liquidation execution, insurance, backstop and ADL are excluded.",
-    "Funding uses the entry notional, a constant user-entered 8h rate and full 8h periods; it is not a forecast of future rates.",
+    "Funding rate is quoted per 8-hour window and applied one eighth per hourly settlement, using entry notional and a constant assumed rate; it is not a forecast.",
     "This result is not an official dreamDEX liquidation price or liquidation status.",
     "A live reference price, when present, is a top-of-book bid/ask midpoint, not the protocol mark price."
   ];
-  return {createdAt:new Date().toISOString(),product:"Perps Stress Lab",version:"0.1.0",network:{name:"Somnia Hideki Testnet",chainId:50383},source:entryPriceSource,priceReference:{...priceReference},side,market,entryPrice:x.entry,quantity:x.quantity,leverage:calculated.leverage,startingMarginPercent:x.marginPercent,startingMarginUsd:calculated.startingMarginUsd,shockPercent:x.shock,stressedPrice:calculated.stressedPrice,pnlUsd:calculated.pnlUsd,funding:{enabled:x.fundingEnabled,rate8hPercent:x.fundingRate,periods:x.periods,estimatedUsd:calculated.fundingUsd,assumption:x.fundingEnabled?"Constant rate over full 8h periods; calculated on entry notional.":"Funding excluded."},equityUsd:calculated.equityUsd,maintenancePercent:x.maintenance,maintenanceUsd:calculated.maintenanceUsd,headroomUsd:calculated.headroomUsd,thresholdStatus:calculated.thresholdStatus,assumptions} satisfies Scenario;
+  return {createdAt:new Date().toISOString(),product:"Perps Stress Lab",version:"0.1.0",network:{name:"Somnia Hideki Testnet",chainId:50383},source:entryPriceSource,priceReference:{...priceReference},side,market,entryPrice:x.entry,quantity:x.quantity,leverage:calculated.leverage,startingMarginPercent:x.marginPercent,startingMarginUsd:calculated.startingMarginUsd,shockPercent:x.shock,stressedPrice:calculated.stressedPrice,pnlUsd:calculated.pnlUsd,funding:{enabled:x.fundingEnabled,rate8hPercent:x.fundingRate,hourlySettlements:x.periods,estimatedUsd:calculated.fundingUsd,assumption:x.fundingEnabled?"Constant 8h quoted rate, settled one eighth per hour on entry notional; calculated for the selected hourly settlements.":"Funding excluded."},equityUsd:calculated.equityUsd,maintenancePercent:x.maintenance,maintenanceUsd:calculated.maintenanceUsd,headroomUsd:calculated.headroomUsd,thresholdStatus:calculated.thresholdStatus,assumptions} satisfies Scenario;
 }
 function update(){
  try{
@@ -81,7 +81,7 @@ function update(){
   threshold.querySelector("p")!.textContent=s.thresholdStatus==="above-estimate"?"Positive headroom in this simplified model. This is not an official liquidation status.":"This model's headroom is non-positive. It does not prove that dreamDEX would liquidate this position.";
   setText("scenario-status",lastRunAt?"SCENARIO REVIEWED":"LIVE PREVIEW");
   setText("report-meta","Local estimate · "+new Date(s.createdAt).toLocaleTimeString());
-  setText("funding-note",s.funding.enabled?"Assumes "+fmt(s.funding.rate8hPercent,3)+"% per 8h period for "+s.funding.periods+" full periods, applied to entry notional.":"Funding is off. Turn it on to model an explicit constant-rate assumption.");
+  setText("funding-note",s.funding.enabled?"Assumes "+fmt(s.funding.rate8hPercent,3)+"% per 8h window, settled hourly, over "+s.funding.hourlySettlements+" hourly settlements on entry notional.":"Funding is off. Turn it on to model an explicit constant-rate assumption.");
   document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>{const selected=Number(b.dataset.shock)===shock;b.classList.toggle("selected",selected);b.setAttribute("aria-pressed",String(selected));});
  }catch(e){
   latest=null;

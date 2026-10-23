@@ -3,6 +3,7 @@ import { ORDER_TYPE, SOMNIA_HIDEKI_TESTNET_ADDRESSES, SomniaMarkets } from "@som
 import { hidekiTestnet } from "@somnia-chain/markets-sdk/chains";
 import { createPublicClient, formatUnits, http, parseUnits, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { decideAfterAmbiguousSubmission, isConfirmedFlat, shouldAttemptEmergencyCleanup } from "../src/recovery-policy.js";
 
 const RPC_URL = "https://api.hideki2.infra.testnet.somnia.network";
 const INDEXER_URL = process.env.HIDEKI_INDEXER_URL ?? "https://hideki-dev.smk.somnia.host/v1/graphql";
@@ -216,7 +217,15 @@ async function main(): Promise<void> {
     if (!poolAddress || !marginBank) throw new Error("BTC market configuration is missing for close.");
     for (let cycle = 0; cycle < 4; cycle += 1) {
       const pos = await currentBtcPosition();
-      if (!pos || !(Number(pos.contracts ?? 0) > 0)) return true;
+      if (!pos || !(Number(pos.contracts ?? 0) > 0)) {
+        const margin = await currentMargin();
+        const orders = await exchange.fetchOpenOrders(marketSymbol);
+        return isConfirmedFlat({
+          positions: { status: "readable", contracts: 0 },
+          lockedCollateral: asBigInt(margin.lockedCollateral, "locked collateral during flat-state verification"),
+          hasOpenOrders: Array.isArray(orders) ? orders.length > 0 : null,
+        });
+      }
       const side = String(pos.side).toLowerCase();
       if (side !== "long" && side !== "short") throw new Error("Cannot determine the side of the open BTC position safely.");
       const isBid = side === "short";
@@ -396,7 +405,20 @@ async function main(): Promise<void> {
     if (entryAttempted) {
       try {
         const remaining = await currentBtcPosition();
-        if (remaining && Number(remaining.contracts ?? 0) > 0) {
+        const recoveryDecision = decideAfterAmbiguousSubmission({
+          txHash: entryHash,
+          receiptStatus: "unknown",
+          stateRead: remaining && Number(remaining.contracts ?? 0) > 0 ? "position-open" : "flat",
+        });
+        if (recoveryDecision === "reconcile-before-any-retry") {
+          console.error("Entry outcome is ambiguous or not independently confirmed. No blind rebroadcast will be attempted.");
+        }
+        if (shouldAttemptEmergencyCleanup({
+          entryWasAttempted: entryAttempted,
+          positionRead: remaining && Number.isFinite(Number(remaining.contracts))
+            ? { status: "readable", contracts: Math.abs(Number(remaining.contracts)), side: String(remaining.side).toLowerCase() === "short" ? "short" : "long" }
+            : { status: "readable", contracts: 0 },
+        })) {
           cleanupAttempted = true;
           console.error("Emergency cleanup: trying to close the BTC position opened in this run.");
           cleanupVerified = await closeCurrentBtcPosition();
@@ -417,13 +439,31 @@ async function main(): Promise<void> {
         marginFinal = marginSummary(await currentMargin());
         const remaining = await currentBtcPosition();
         positionAfterClose = positionSummary(remaining);
-        if (entryAttempted) positionClosed = !remaining || !(Number(remaining.contracts ?? 0) > 0);
-        if (entryAttempted && !positionClosed && !cleanupAttempted) {
+        if (entryAttempted) {
+          const finalOrders = await exchange.fetchOpenOrders(marketSymbol);
+          marginFinal = marginSummary(await currentMargin());
+          positionClosed = isConfirmedFlat({
+            positions: { status: "readable", contracts: remaining ? Math.abs(Number(remaining.contracts ?? 0)) : 0 },
+            lockedCollateral: marginFinal?.lockedCollateral == null ? null : asBigInt(marginFinal.lockedCollateral, "final locked collateral"),
+            hasOpenOrders: Array.isArray(finalOrders) ? finalOrders.length > 0 : null,
+          });
+        }
+        if (entryAttempted && !positionClosed && !cleanupAttempted && shouldAttemptEmergencyCleanup({
+          entryWasAttempted: entryAttempted,
+          positionRead: remaining && Number.isFinite(Number(remaining.contracts))
+            ? { status: "readable", contracts: Math.abs(Number(remaining.contracts)), side: String(remaining.side).toLowerCase() === "short" ? "short" : "long" }
+            : { status: "readable", contracts: 0 },
+        })) {
           cleanupAttempted = true;
           cleanupVerified = await closeCurrentBtcPosition();
           const afterCleanup = await currentBtcPosition();
           positionAfterClose = positionSummary(afterCleanup);
-          positionClosed = !afterCleanup || !(Number(afterCleanup.contracts ?? 0) > 0);
+          const finalOrders = await exchange.fetchOpenOrders(marketSymbol);
+          positionClosed = isConfirmedFlat({
+            positions: { status: "readable", contracts: afterCleanup ? Math.abs(Number(afterCleanup.contracts ?? 0)) : 0 },
+            lockedCollateral: marginFinal?.lockedCollateral == null ? null : asBigInt(marginFinal.lockedCollateral, "locked collateral after cleanup"),
+            hasOpenOrders: Array.isArray(finalOrders) ? finalOrders.length > 0 : null,
+          });
         }
       }
     } catch (finalReadError) {

@@ -43,3 +43,16 @@ This campaign separates deterministic model tests from protocol-backed testnet c
 - FAIL when an assertion fails or a transaction violates an invariant.
 - BLOCKED when required RPC, wallet secret or testnet precondition is unavailable.
 - NOT TESTED when no safe execution or simulation was run.
+
+
+## Implemented follow-up verification
+
+- `src/protocol-reference.test.ts` checks published initial/maintenance/close-out tiers for 20x, 10x and 5x markets; checks the official 1 BTC × 100,000 USDso × 0.08%/8h example; and tests strict-below-maintenance boundary behavior.
+- Funding in the app now treats the entered rate as a quoted 8-hour rate and applies one eighth for each hourly settlement. The user interface says “hourly settlements” rather than “8h periods”.
+- `src/recovery-policy.test.ts` injects unavailable reads, ambiguous transaction outcomes, leftover locked collateral, open orders and cleanup eligibility. Unknown final state is never counted as flat; an ambiguous send is not authorized for blind rebroadcast.
+- The position round-trip now requires a readable zero position, zero locked collateral and no open market orders to declare the tested BTC lifecycle flat. Cleanup is only considered after entry was attempted and a position read confirms exposure.
+- `npm run check:protocol-reference` performs read-only checks on Hideki chain ID and compares each live MarginBank system config with the published collateral, factory, liquidation-engine and insurance-fund addresses.
+
+## Protocol accuracy boundary
+
+The public docs say cross margin is the default and liquidation begins when **account equity** falls below maintenance. A single-position formula cannot accurately infer the real account liquidation threshold without aggregate account equity, all positions and orders, fees/funding accounting, the protocol mark/index price, and exact contract rounding. The live config check confirms wiring only; it does not execute or prove the LiquidationEngine's internal liquidation algorithm. Controlled liquidation execution is deliberately not broadcast from this demo wallet because it would risk the position/account state. To prove contract-level liquidation behavior, obtain verified contract source/ABI and test it on a local fork or a dedicated disposable test account/stateful harness.

@@ -29,7 +29,7 @@ For entry price `E`, quantity `Q`, price shock `s`, starting margin percentage `
 - Estimated maintenance: `Q × P × r / 100`
 - Estimated headroom: `estimated equity − estimated maintenance`
 
-Optional funding is a deliberately simplified scenario: positive 8-hour rate means longs pay shorts; it applies the user-entered constant rate to entry notional for whole 8-hour periods. This does not reproduce all dreamDEX settlement/accounting behaviour.
+Optional funding uses the documented sign and settlement cadence: the rate is quoted per 8-hour window and one eighth is applied per hourly settlement. The scenario holds the user-entered rate and entry notional constant. It is still an estimate; it does not model rate changes, exact index price, settlement timing, or all account accounting.
 
 ## Network
 
@@ -53,7 +53,7 @@ Optional funding is a deliberately simplified scenario: positive 8-hour rate mea
 - [x] Playwright browser tests cover live-price prefill, long/short P&L direction, honest JSON export flags, 360–390px mobile layout, and persisted light/dim theme switching.
 - [ ] Deployed preview smoke check confirms the Vercel serverless endpoints are live and returning fresh Hideki data. The preview is currently access-protected; the preview check reports a skip unless `VERCEL_AUTOMATION_BYPASS_SECRET` is configured in GitHub Actions. A separate read-only check now also runs against the production URL after pushes to main.
 
-A successful market read does not validate the stress model. A successful order does not prove liquidation accuracy. The model must not claim protocol-accurate liquidation prediction without independently validated account-equity rules, fees, funding, cross-margin interactions and liquidation-engine behaviour.
+A successful market read does not validate the stress model. A successful order does not prove liquidation accuracy. Funding is now calculated as one eighth of the quoted 8-hour rate per hourly settlement, matching the public documentation's example. The public documentation says cross margin is the default: positions share one USDso account balance and maintenance is account-wide. The app intentionally remains a single-position scenario, so it must not label a negative headroom result as a protocol liquidation verdict. The new protocol-reference tests check the published 5x/10x/20x margin tiers and the official hourly funding example. A live read-only script checks chain ID and MarginBank wiring against published Hideki addresses. Neither step proves the internal LiquidationEngine execution path; that requires contract-source verification or a controlled fork/stateful test harness.
 
 ## Manual funded testnet position lifecycle (verified)
 

@@ -35,8 +35,8 @@ describe("calculateStress", () => {
   it("treats positive funding as a cost for longs and income for shorts", () => {
     const long = calculateStress({ ...base, shockPercent: 0, fundingEnabled: true, fundingRate8hPercent: 0.08, fundingPeriods: 3 });
     const short = calculateStress({ ...base, side: "short", shockPercent: 0, fundingEnabled: true, fundingRate8hPercent: 0.08, fundingPeriods: 3 });
-    expect(long.fundingUsd).toBeCloseTo(-2.4);
-    expect(short.fundingUsd).toBeCloseTo(2.4);
+    expect(long.fundingUsd).toBeCloseTo(-0.3);
+    expect(short.fundingUsd).toBeCloseTo(0.3);
   });
 
   it("ignores a supplied funding rate when funding is disabled", () => {
