@@ -7,7 +7,7 @@ const INDEXER_URL = process.env.HIDEKI_INDEXER_URL ?? "https://hideki-dev.smk.so
 const WS_RPC_URL = "wss://api.hideki2.infra.testnet.somnia.network/ws";
 const EXPECTED = {
   collateral: "0xed7993a74dae1e6656b704a424dcd8711aaf4f72",
-  factory: "0xe631faee547bae07353e290f0562ea67d856560",
+  factory: "0xe631faee547baee07353e290f0562ea67d856560",
   liquidationEngine: "0xa66d3c24ad4a389d863846905d8173e1017e9f4d",
   insuranceFund: "0x50826894d47c6d4f3bea38bfdc7dc5c5be171b80",
 };
