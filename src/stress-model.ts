@@ -57,7 +57,7 @@ export function calculateStress(input: StressInput): StressOutput {
   const pnlUsd = quantity * (stressedPrice - entryPrice) * direction;
   const startingMarginUsd = quantity * entryPrice * startingMarginPercent / 100;
   // Scenario assumption only: positive 8h rate means longs pay shorts.
-  const fundingUsd = fundingEnabled
+  const fundingUsd = fundingEnabled && fundingRate !== 0 && periods !== 0
     ? -direction * quantity * entryPrice * (fundingRate / 100) * periods
     : 0;
   const equityUsd = startingMarginUsd + pnlUsd + fundingUsd;
