@@ -11,8 +11,6 @@ on:
           - "NO"
           - "YES"
         default: "NO"
-  push:
-    branches: [main]
 
 permissions:
   contents: read
@@ -24,14 +22,14 @@ concurrency:
 jobs:
   safety-stop:
     name: No withdrawal authorized
-    if: ${{ !((github.event_name == 'workflow_dispatch' && inputs.confirm_spot_withdrawal == 'YES') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[RUN_SPOT_WITHDRAWAL_TEST]'))) }}
+    if: inputs.confirm_spot_withdrawal != 'YES'
     runs-on: ubuntu-latest
     steps:
-      - run: echo "No withdrawal sent. Select YES or use the one-shot run marker after all safety checks pass."
+      - run: echo "No withdrawal sent. Select YES to withdraw exactly 5 paper USDso after all safety checks pass."
 
   withdraw-and-verify:
     name: Withdraw 5 USDso to Spot and independently verify balances
-    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.confirm_spot_withdrawal == 'YES') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[RUN_SPOT_WITHDRAWAL_TEST]')) }}
+    if: inputs.confirm_spot_withdrawal == 'YES'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -46,7 +44,7 @@ jobs:
       - name: Withdraw exactly 5 USDso only after live safety gates pass
         env:
           WALLET_KEY: ${{ secrets.wallet_key }}
-          CONFIRM_SPOT_WITHDRAWAL_E2E: ${{ github.event_name == 'push' && 'YES' || inputs.confirm_spot_withdrawal }}
+          CONFIRM_SPOT_WITHDRAWAL_E2E: ${{ inputs.confirm_spot_withdrawal }}
         run: npm run testnet:spot-withdrawal
       - name: Upload redacted withdrawal receipt
         if: always()
