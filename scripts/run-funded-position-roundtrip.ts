@@ -433,13 +433,19 @@ async function main(): Promise<void> {
         positionAfterClose = positionSummary(remaining);
         if (entryAttempted) {
           const finalOrders = await exchange.fetchOpenOrders(marketSymbol);
+          marginFinal = marginSummary(await currentMargin());
           positionClosed = isConfirmedFlat({
             positions: { status: "readable", contracts: remaining ? Math.abs(Number(remaining.contracts ?? 0)) : 0 },
             lockedCollateral: asBigInt(marginFinal?.lockedCollateral ?? 0n, "final locked collateral"),
             hasOpenOrders: Array.isArray(finalOrders) ? finalOrders.length > 0 : null,
           });
         }
-        if (entryAttempted && !positionClosed && !cleanupAttempted) {
+        if (entryAttempted && !positionClosed && !cleanupAttempted && shouldAttemptEmergencyCleanup({
+          entryWasAttempted: entryAttempted,
+          positionRead: remaining && Number.isFinite(Number(remaining.contracts))
+            ? { status: "readable", contracts: Math.abs(Number(remaining.contracts)), side: String(remaining.side).toLowerCase() === "short" ? "short" : "long" }
+            : { status: "readable", contracts: 0 },
+        })) {
           cleanupAttempted = true;
           cleanupVerified = await closeCurrentBtcPosition();
           const afterCleanup = await currentBtcPosition();
