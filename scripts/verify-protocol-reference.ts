@@ -28,7 +28,7 @@ async function main() {
     const marginBanks = [...new Set(rows.map((row) => address(row.marginBank, "market MarginBank")))];
     const checks: Array<Record<string, unknown>> = [];
     for (const marginBank of marginBanks) {
-      const config = await exchange.client.getPerpSystemConfig(marginBank) as Record<string, unknown>;
+      const config = await exchange.client.getPerpSystemConfig(marginBank as `0x${string}`) as unknown as Record<string, unknown>;
       const actual = {
         collateral: address(config.collateral, "collateral"),
         factory: address(config.factory ?? config.perpPoolFactory, "PerpPoolFactory"),
