@@ -3,7 +3,7 @@ import { ORDER_TYPE, SOMNIA_HIDEKI_TESTNET_ADDRESSES, SomniaMarkets } from "@som
 import { hidekiTestnet } from "@somnia-chain/markets-sdk/chains";
 import { createPublicClient, formatUnits, http, parseUnits, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { isConfirmedFlat, shouldAttemptEmergencyCleanup } from "../src/recovery-policy.js";
+import { decideAfterAmbiguousSubmission, isConfirmedFlat, shouldAttemptEmergencyCleanup } from "../src/recovery-policy.js";
 
 const RPC_URL = "https://api.hideki2.infra.testnet.somnia.network";
 const INDEXER_URL = process.env.HIDEKI_INDEXER_URL ?? "https://hideki-dev.smk.somnia.host/v1/graphql";
@@ -405,6 +405,14 @@ async function main(): Promise<void> {
     if (entryAttempted) {
       try {
         const remaining = await currentBtcPosition();
+        const recoveryDecision = decideAfterAmbiguousSubmission({
+          txHash: entryHash,
+          receiptStatus: "unknown",
+          stateRead: remaining && Number(remaining.contracts ?? 0) > 0 ? "position-open" : "flat",
+        });
+        if (recoveryDecision === "reconcile-before-any-retry") {
+          console.error("Entry outcome is ambiguous or not independently confirmed. No blind rebroadcast will be attempted.");
+        }
         if (shouldAttemptEmergencyCleanup({
           entryWasAttempted: entryAttempted,
           positionRead: remaining && Number.isFinite(Number(remaining.contracts))
