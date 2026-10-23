@@ -38,6 +38,7 @@ export function documentedHourlyFundingUsd(input: {
   }
   const direction = side === "long" ? 1 : side === "short" ? -1 : 0;
   if (!direction) throw new Error("Position side must be long or short.");
+  if (quantity === 0 || fundingRate8hPercent === 0 || hourlySettlements === 0) return 0;
   const result = -direction * quantity * indexPrice * (fundingRate8hPercent / 100) / 8 * hourlySettlements;
   if (!Number.isFinite(result)) throw new Error("Funding result exceeds supported numeric range.");
   return result;
