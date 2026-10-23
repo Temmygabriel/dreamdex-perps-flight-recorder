@@ -39,11 +39,11 @@ function compute(){
     "Estimated equity = starting margin + directional unrealised P&L + optional simplified funding estimate.",
     "Maintenance requirement = quantity × stressed price × user-entered maintenance percentage.",
     "Fees, slippage, realised/unrealised accounting differences, liquidation execution, insurance, backstop and ADL are excluded.",
-    "Funding uses the entry notional, a constant user-entered 8h rate and full 8h periods; it is not a forecast of future rates.",
+    "Funding rate is quoted per 8-hour window and applied one eighth per hourly settlement, using entry notional and a constant assumed rate; it is not a forecast.",
     "This result is not an official dreamDEX liquidation price or liquidation status.",
     "A live reference price, when present, is a top-of-book bid/ask midpoint, not the protocol mark price."
   ];
-  return {createdAt:new Date().toISOString(),product:"Perps Stress Lab",version:"0.1.0",network:{name:"Somnia Hideki Testnet",chainId:50383},source:entryPriceSource,priceReference:{...priceReference},side,market,entryPrice:x.entry,quantity:x.quantity,leverage:calculated.leverage,startingMarginPercent:x.marginPercent,startingMarginUsd:calculated.startingMarginUsd,shockPercent:x.shock,stressedPrice:calculated.stressedPrice,pnlUsd:calculated.pnlUsd,funding:{enabled:x.fundingEnabled,rate8hPercent:x.fundingRate,periods:x.periods,estimatedUsd:calculated.fundingUsd,assumption:x.fundingEnabled?"Constant rate over full 8h periods; calculated on entry notional.":"Funding excluded."},equityUsd:calculated.equityUsd,maintenancePercent:x.maintenance,maintenanceUsd:calculated.maintenanceUsd,headroomUsd:calculated.headroomUsd,thresholdStatus:calculated.thresholdStatus,assumptions} satisfies Scenario;
+  return {createdAt:new Date().toISOString(),product:"Perps Stress Lab",version:"0.1.0",network:{name:"Somnia Hideki Testnet",chainId:50383},source:entryPriceSource,priceReference:{...priceReference},side,market,entryPrice:x.entry,quantity:x.quantity,leverage:calculated.leverage,startingMarginPercent:x.marginPercent,startingMarginUsd:calculated.startingMarginUsd,shockPercent:x.shock,stressedPrice:calculated.stressedPrice,pnlUsd:calculated.pnlUsd,funding:{enabled:x.fundingEnabled,rate8hPercent:x.fundingRate,periods:x.periods,estimatedUsd:calculated.fundingUsd,assumption:x.fundingEnabled?"Constant 8h quoted rate, settled one eighth per hour on entry notional; calculated for the selected hourly settlements.":"Funding excluded."},equityUsd:calculated.equityUsd,maintenancePercent:x.maintenance,maintenanceUsd:calculated.maintenanceUsd,headroomUsd:calculated.headroomUsd,thresholdStatus:calculated.thresholdStatus,assumptions} satisfies Scenario;
 }
 function update(){
  try{
@@ -81,7 +81,7 @@ function update(){
   threshold.querySelector("p")!.textContent=s.thresholdStatus==="above-estimate"?"Positive headroom in this simplified model. This is not an official liquidation status.":"This model's headroom is non-positive. It does not prove that dreamDEX would liquidate this position.";
   setText("scenario-status",lastRunAt?"SCENARIO REVIEWED":"LIVE PREVIEW");
   setText("report-meta","Local estimate · "+new Date(s.createdAt).toLocaleTimeString());
-  setText("funding-note",s.funding.enabled?"Assumes "+fmt(s.funding.rate8hPercent,3)+"% per 8h period for "+s.funding.periods+" full periods, applied to entry notional.":"Funding is off. Turn it on to model an explicit constant-rate assumption.");
+  setText("funding-note",s.funding.enabled?"Assumes "+fmt(s.funding.rate8hPercent,3)+"% per 8h window, settled hourly, over "+s.funding.periods+" hourly settlements on entry notional.":"Funding is off. Turn it on to model an explicit constant-rate assumption.");
   document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>{const selected=Number(b.dataset.shock)===shock;b.classList.toggle("selected",selected);b.setAttribute("aria-pressed",String(selected));});
  }catch(e){
   latest=null;
