@@ -57,7 +57,7 @@ A successful market read does not validate the stress model. A successful order 
 
 ## Manual funded testnet position lifecycle (verified)
 
-The repository includes a [manually triggered GitHub Actions workflow](.github/workflows/testnet-position-roundtrip.yml). It skips the broken voucher self-claim path and uses the existing wallet-held USDso directly. The verified run used the account's existing 1.5 USDso Perps balance, deposited an additional 5 USDso from the wallet, opened and immediately closed one BTC long position, and confirmed the account was flat afterward. The final Perps margin remains in the Perps account; this test does not withdraw it back to Spot. It is explicitly gated behind a manual YES confirmation and never runs on pushes or pull requests.
+The repository includes a [manually triggered GitHub Actions workflow](.github/workflows/testnet-position-roundtrip.yml). It skips the broken voucher self-claim path and uses the existing wallet-held USDso directly. The verified run used the account's existing 1.5 USDso Perps balance, deposited an additional 5 USDso from the wallet, opened and immediately closed one BTC long position, and confirmed the account was flat afterward. The position round-trip workflow itself leaves margin in Perps. A separate, independently verified Spot-withdrawal test has now successfully moved exactly 5 USDso back to the same wallet after confirming there were no open positions or orders. Both live transaction workflows are gated and run on Hideki testnet only.
 
 The voucher defect remains a separate, known protocol issue: the SDK can report `eligible: true` while `VoucherDistributor.claim()` reverts with `0x3e31dcc2`. Independent reports document the same failure: [eligibility reports true while self-claim reverts](https://github.com/MrTimonM/findings/blob/6b42ad2df15b53b513783f554001d9692dc94fc3/feedback/01-voucher-eligibility-says-eligible-but-claim-always-reverts.md) and [the SDK cannot decode the VoucherDistributor selector](https://github.com/MrTimonM/findings/blob/6b42ad2df15b53b513783f554001d9692dc94fc3/feedback/08-sdk-cannot-decode-voucher-distributor-error.md). That issue no longer blocks trading for this wallet because we have verified the direct wallet-to-margin path.
 
@@ -72,6 +72,20 @@ Latest successful test evidence:
 - Full GitHub Actions run and artifact: https://github.com/Temmygabriel/dreamdex-perps-flight-recorder/actions/runs/39699761793.
 
 To repeat a run after merging, open Actions → **Perps Stress Lab funded testnet position round-trip** → Run workflow and choose `YES`. If unlocked Perps margin is below 5 USDso, the workflow moves exactly 5 USDso from the existing wallet balance; if the account already has at least 5 USDso unlocked, it skips the transfer so repeated tests do not keep sweeping funds from the wallet. It then opens one BTC long MARKET position with a 15 USDso notional cap and immediately closes it. The workflow aborts if an existing position or BTC order is found, writes a redacted evidence receipt, and never prints the private key. This confirms a short open/close lifecycle on Hideki; it does not establish liquidation accuracy or constitute a sustained trading strategy. Never use a private key that controls mainnet funds.
+
+## Manual Perps-to-Spot withdrawal (verified)
+
+A separate [manually gated withdrawal workflow](.github/workflows/testnet-spot-withdrawal.yml) successfully withdrew exactly **5 USDso** from the Perps MarginBank back to the same wallet's Spot balance on Somnia Hideki testnet. The script refuses to broadcast unless chain ID is 50383, the wallet has no open positions or orders, and both unlocked and withdrawable collateral are at least 5 USDso. It then independently reads the wallet token balance and Perps margin to verify the exact deltas.
+
+- Withdrawal transaction: `0x8e2ed2da20c038f1b462a65e48b52290d30ba46e60084b0d01fc119f0965bd57`.
+- Spot USDso: **93.5 → 98.5**; independently read increase: **+5 USDso**.
+- Perps unlocked/withdrawable collateral: **6.499832 → 1.499832 USDso**; independently read decrease: **−5 USDso**.
+- Positions before/after: **0 / 0**.
+- All receipt assertions passed: correct chain, exact Spot increase, exact Perps decrease, and no positions remaining.
+- GitHub Actions run: https://github.com/Temmygabriel/dreamdex-perps-flight-recorder/actions/runs/39875589587.
+- Redacted receipt artifact: https://github.com/Temmygabriel/dreamdex-perps-flight-recorder/actions/runs/39875589587/artifacts/12468646037.
+
+The security and failure-recovery campaign checklist is in [SECURITY_STRESS_WITHDRAWAL_TEST_PLAN.md](SECURITY_STRESS_WITHDRAWAL_TEST_PLAN.md). Deterministic model tests now include a multi-dimensional invariant grid. These tests validate the simplified scenario formulas; they do **not** prove dreamDEX liquidation-engine accuracy or every possible protocol security property.
 
 ## Security and dependency audit\n\nCI now runs `npm audit --audit-level=high` and verifies the installed dependency tree. The repository currently has no committed `package-lock.json`; the audit job generates a temporary lockfile during CI. This detects known advisories for the resolved dependency tree in that run, but dependency versions are not yet reproducible across separate clean installs. Commit a reviewed lockfile before treating dependency resolution as fully reproducible. API handlers return generic upstream failure messages rather than exposing raw SDK exception strings.\n\n## Run checks
 
