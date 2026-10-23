@@ -436,7 +436,7 @@ async function main(): Promise<void> {
           marginFinal = marginSummary(await currentMargin());
           positionClosed = isConfirmedFlat({
             positions: { status: "readable", contracts: remaining ? Math.abs(Number(remaining.contracts ?? 0)) : 0 },
-            lockedCollateral: asBigInt(marginFinal?.lockedCollateral ?? 0n, "final locked collateral"),
+            lockedCollateral: marginFinal?.lockedCollateral == null ? null : asBigInt(marginFinal.lockedCollateral, "final locked collateral"),
             hasOpenOrders: Array.isArray(finalOrders) ? finalOrders.length > 0 : null,
           });
         }
@@ -453,7 +453,7 @@ async function main(): Promise<void> {
           const finalOrders = await exchange.fetchOpenOrders(marketSymbol);
           positionClosed = isConfirmedFlat({
             positions: { status: "readable", contracts: afterCleanup ? Math.abs(Number(afterCleanup.contracts ?? 0)) : 0 },
-            lockedCollateral: asBigInt(marginFinal?.lockedCollateral ?? 0n, "locked collateral after cleanup"),
+            lockedCollateral: marginFinal?.lockedCollateral == null ? null : asBigInt(marginFinal.lockedCollateral, "locked collateral after cleanup"),
             hasOpenOrders: Array.isArray(finalOrders) ? finalOrders.length > 0 : null,
           });
         }
