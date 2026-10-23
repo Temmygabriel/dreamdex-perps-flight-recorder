@@ -111,6 +111,9 @@ jobs:
       - name: Check market minimums against live books (read-only)
         run: npx tsx scripts/inspect-market-minimums.ts
 
+      - name: Verify live MarginBank system wiring against published Hideki addresses
+        run: npm run check:protocol-reference
+
 
   test-wallet-read-only:
     name: Optional funded test wallet check (read-only)
