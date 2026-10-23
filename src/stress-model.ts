@@ -1,3 +1,5 @@
+import { documentedHourlyFundingUsd } from "./protocol-reference.js";
+
 export type PositionSide = "long" | "short";
 
 export type StressInput = {
@@ -9,7 +11,7 @@ export type StressInput = {
   maintenancePercent: number;
   fundingEnabled?: boolean;
   fundingRate8hPercent?: number;
-  fundingPeriods?: number;
+  fundingPeriods?: number; // hourly settlement count; the rate is quoted per 8-hour window
 };
 
 export type StressOutput = {
@@ -56,9 +58,13 @@ export function calculateStress(input: StressInput): StressOutput {
   const direction = side === "long" ? 1 : -1;
   const pnlUsd = quantity * (stressedPrice - entryPrice) * direction;
   const startingMarginUsd = quantity * entryPrice * startingMarginPercent / 100;
-  // Scenario assumption only: positive 8h rate means longs pay shorts.
-  const fundingUsd = fundingEnabled && fundingRate !== 0 && periods !== 0
-    ? -direction * quantity * entryPrice * (fundingRate / 100) * periods
+  // dreamDEX quotes funding per 8-hour window but settles one eighth each hour.
+  // The UI input is the number of hourly settlements at a constant assumed rate.
+  const fundingUsd = fundingEnabled
+    ? documentedHourlyFundingUsd({
+        quantity, indexPrice: entryPrice, fundingRate8hPercent: fundingRate,
+        hourlySettlements: periods, side,
+      })
     : 0;
   const equityUsd = startingMarginUsd + pnlUsd + fundingUsd;
   const maintenanceUsd = quantity * stressedPrice * maintenancePercent / 100;
