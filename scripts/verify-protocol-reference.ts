@@ -29,6 +29,8 @@ async function main() {
     const checks: Array<Record<string, unknown>> = [];
     for (const marginBank of marginBanks) {
       const config = await exchange.client.getPerpSystemConfig(marginBank as `0x${string}`) as unknown as Record<string, unknown>;
+      if (config.fullyWired !== true) throw new Error("Live MarginBank reports fullyWired !== true.");
+      if (!Number.isFinite(Number(config.maxLeverageLimit)) || Number(config.maxLeverageLimit) <= 0) throw new Error("Live MarginBank exposes no valid maximum leverage limit.");
       console.log("MarginBank config fields for " + marginBank + ": " + Object.keys(config ?? {}).join(", "));
       console.log("Live public config addresses: " + JSON.stringify({ collateralToken: config.collateralToken, perpPoolFactory: config.perpPoolFactory, liquidationEngine: config.liquidationEngine, insuranceFund: config.insuranceFund, fullyWired: config.fullyWired }));
       const marketForBank = rows.find((row) => norm(row.marginBank) === marginBank);
