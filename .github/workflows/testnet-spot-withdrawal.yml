@@ -1,0 +1,56 @@
+name: Perps Stress Lab Perps-to-Spot withdrawal verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_spot_withdrawal:
+        description: "YES authorizes withdrawal of exactly 5 paper USDso from Perps back to Spot on Hideki testnet. Requires no open positions or orders."
+        required: true
+        type: choice
+        options:
+          - "NO"
+          - "YES"
+        default: "NO"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perps-spot-withdrawal-verification
+  cancel-in-progress: false
+
+jobs:
+  safety-stop:
+    name: No withdrawal authorized
+    if: inputs.confirm_spot_withdrawal != 'YES'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "No withdrawal sent. Select YES to withdraw exactly 5 paper USDso after all safety checks pass."
+
+  withdraw-and-verify:
+    name: Withdraw 5 USDso to Spot and independently verify balances
+    if: inputs.confirm_spot_withdrawal == 'YES'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install project dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck before any transaction
+        run: npm run typecheck
+      - name: Withdraw exactly 5 USDso only after live safety gates pass
+        env:
+          WALLET_KEY: ${{ secrets.wallet_key }}
+          CONFIRM_SPOT_WITHDRAWAL_E2E: ${{ inputs.confirm_spot_withdrawal }}
+        run: npm run testnet:spot-withdrawal
+      - name: Upload redacted withdrawal receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perps-stress-lab-spot-withdrawal
+          path: artifacts/perps-stress-lab-spot-withdrawal.json
+          if-no-files-found: warn
+          retention-days: 30
