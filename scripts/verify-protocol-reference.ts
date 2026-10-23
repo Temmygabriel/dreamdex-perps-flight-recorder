@@ -29,8 +29,10 @@ async function main() {
     const checks: Array<Record<string, unknown>> = [];
     for (const marginBank of marginBanks) {
       const config = await exchange.client.getPerpSystemConfig(marginBank as `0x${string}`) as unknown as Record<string, unknown>;
+      console.log("MarginBank config fields for " + marginBank + ": " + Object.keys(config ?? {}).join(", "));
+      const marketForBank = rows.find((row) => norm(row.marginBank) === marginBank);
       const actual = {
-        collateral: address(config.collateral, "collateral"),
+        collateral: address(config.collateral ?? config.collateralToken ?? config.collateralAddress ?? marketForBank?.quoteToken, "collateral"),
         factory: address(config.factory ?? config.perpPoolFactory, "PerpPoolFactory"),
         liquidationEngine: address(config.liquidationEngine, "LiquidationEngine"),
         insuranceFund: address(config.insuranceFund, "InsuranceFund"),
