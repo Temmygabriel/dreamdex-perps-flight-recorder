@@ -105,4 +105,43 @@ describe("calculateStress", () => {
       ...base, entryPrice: Number.MAX_VALUE, quantity: Number.MAX_VALUE, shockPercent: 50,
     })).toThrow(/numeric range/);
   });
+
+  it("passes a deterministic grid of formula invariants across both sides and boundary shocks", () => {
+    const shocks = [-100, -99.9, -75, -50, -1, 0, 1, 25, 50, 100, 250];
+    const margins = [0.1, 1, 5, 10, 50, 100];
+    const maintenances = [0.01, 0.5, 2.5, 10, 50];
+    const quantities = [0.000001, 0.01, 1, 123.456];
+    for (const side of ["long", "short"] as const) {
+      for (const shockPercent of shocks) {
+        for (const startingMarginPercent of margins) {
+          for (const maintenancePercent of maintenances) {
+            for (const quantity of quantities) {
+              const result = calculateStress({
+                side, entryPrice: 42_000, quantity, startingMarginPercent,
+                shockPercent, maintenancePercent, fundingEnabled: true,
+                fundingRate8hPercent: 0.037, fundingPeriods: 7,
+              });
+              expect(Number.isFinite(result.stressedPrice)).toBe(true);
+              expect(result.stressedPrice).toBeGreaterThanOrEqual(0);
+              expect(result.equityUsd).toBeCloseTo(result.startingMarginUsd + result.pnlUsd + result.fundingUsd, 7);
+              expect(result.headroomUsd).toBeCloseTo(result.equityUsd - result.maintenanceUsd, 7);
+              expect(result.leverage).toBeCloseTo(100 / startingMarginPercent, 10);
+              expect(result.thresholdStatus).toBe(result.headroomUsd > 0 ? "above-estimate" : "at-or-below-estimate");
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("keeps funding exactly zero for zero periods and a zero rate", () => {
+    expect(calculateStress({ ...base, shockPercent: 0, fundingEnabled: true, fundingRate8hPercent: 5, fundingPeriods: 0 }).fundingUsd).toBe(0);
+    expect(calculateStress({ ...base, shockPercent: 0, fundingEnabled: true, fundingRate8hPercent: 0, fundingPeriods: 9 }).fundingUsd).toBe(0);
+  });
+
+  it("rejects negative funding periods and negative maintenance", () => {
+    expect(() => calculateStress({ ...base, fundingPeriods: -1, fundingEnabled: true })).toThrow(/whole number/);
+    expect(() => calculateStress({ ...base, maintenancePercent: -1 })).toThrow(/Maintenance margin/);
+  });
+
 });
