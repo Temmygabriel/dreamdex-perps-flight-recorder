@@ -12,7 +12,7 @@ The MarginBank's live system config points to LiquidationEngine proxy `0xA66d3C2
 - Implementation runtime: 75,969 bytes, Keccak-256 `0x9c02bc18c416e765e2e3299fa77c0e35098655534d2d313588c288b9bff0aea7`
 - The official Hideki docs publish the proxy address, not the implementation source.
 
-Initial read-only source discovery queried Sourcify full/partial-match metadata and the published explorer source endpoint. Those probes did not establish verified implementation source or ABI. An expanded explorer ABI probe is included in the follow-up CI workflow; its receipt must be checked before declaring the ABI search complete. Bytecode presence/hash does not establish source verification or contract correctness.
+Read-only source discovery queried Sourcify full/partial-match metadata and the published explorer source/ABI endpoints for both proxy and implementation. Sourcify returned HTTP 404 for both addresses; the explorer ABI endpoint returned “Contract source code not verified” for both. The explorer source endpoint returned no verified source, and the Etherscan-compatible endpoint reports this chain ID as unsupported. Therefore neither verified implementation source nor an authoritative write ABI was obtained from the public endpoints checked. This is an evidence-based access result, not proof that DreamDEX has no private/internal source. Bytecode presence/hash does not establish source verification or contract correctness. Source-discovery receipt: GitHub Actions run https://github.com/Temmygabriel/dreamdex-perps-flight-recorder/actions/runs/40133046888 (artifact `hideki-liquidation-source-discovery`).
 
 ## 2. What the authoritative SDK documentation establishes
 
