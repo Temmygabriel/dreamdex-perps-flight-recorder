@@ -1,8 +1,6 @@
 name: Hideki funded position round-trip
 
 on:
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -11,7 +9,6 @@ permissions:
 jobs:
   funded-position-roundtrip:
     name: Funded BTC position open-close verification (Hideki testnet)
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/read-only-account-risk-check')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
