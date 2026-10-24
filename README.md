@@ -44,7 +44,7 @@ Optional funding uses the documented sign and settlement cadence: the rate is qu
 **The current branch is an implementation in progress.** Do not describe it as fully verified against Hideki until the following have been demonstrated:
 
 - [x] GitHub Actions typecheck, unit tests and production build pass on the latest tested revision.
-- [x] The production URL `https://orderproof-perp.vercel.app` returns the live Hideki market list and a fresh BTC top-of-book midpoint. The midpoint is not the protocol mark price; preview verification is still skipped when Vercel preview protection blocks anonymous access.
+- [x] The production URL `https://perp-stress-lab.vercel.app` returns the live Hideki market list and a fresh BTC top-of-book midpoint. The midpoint is not the protocol mark price; preview verification is still skipped when Vercel preview protection blocks anonymous access.
 - [x] Formula tests validate long/short symmetry, funding direction, quantity scaling, total-loss shock, headroom invariants, invalid inputs, and overflow protection.
 - [x] CI performs a read-only Perps account readiness check: voucher eligibility and SDK max-order-size gate, without signing or sending a transaction.
 - [ ] Any account-aware stress mode is implemented only after the SDK exposes the required Perps account data and it is validated against the protocol.
