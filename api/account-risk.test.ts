@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getMarginAccount: vi.fn(),
   getPerpCollateralBasis: vi.fn(),
   listPerpPositions: vi.fn(),
+  listPerpPositionAnalytics: vi.fn(),
   getPerpPosition: vi.fn(),
   getPerpPositionAnalytics: vi.fn(),
   getLiquidationPrice: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock("@somnia-chain/markets-sdk", () => ({
         getMarginAccount: mocks.getMarginAccount,
         getPerpCollateralBasis: mocks.getPerpCollateralBasis,
         listPerpPositions: mocks.listPerpPositions,
+        listPerpPositionAnalytics: mocks.listPerpPositionAnalytics,
         getPerpPosition: mocks.getPerpPosition,
         getPerpPositionAnalytics: mocks.getPerpPositionAnalytics,
         getLiquidationPrice: mocks.getLiquidationPrice,
@@ -78,6 +80,7 @@ describe("GET /api/account-risk", () => {
     mocks.getMarginAccount.mockResolvedValue(marginState());
     mocks.getPerpCollateralBasis.mockResolvedValue(100000000000000000000n);
     mocks.listPerpPositions.mockResolvedValue([]);
+    mocks.listPerpPositionAnalytics.mockResolvedValue([]);
     mocks.getPerpPosition.mockImplementation(async (ref: { pool: string }) => posFor(ref.pool));
     mocks.getPerpPositionAnalytics.mockImplementation(async (ref: { pool: string }) => metricsFor(ref.pool));
     mocks.getLiquidationPrice.mockResolvedValue(85000000000000000000000n);
@@ -108,6 +111,10 @@ describe("GET /api/account-risk", () => {
 
   it("reads every active pool and returns multiple cross-margin positions with independent SDK estimates", async () => {
     mocks.getMarginAccount.mockResolvedValue(marginState([btcPool, ethPool]));
+    mocks.listPerpPositionAnalytics.mockResolvedValue([
+      { ...posFor(btcPool), ...metricsFor(btcPool), pool: btcPool },
+      { ...posFor(ethPool), ...metricsFor(ethPool), pool: ethPool },
+    ]);
     const { res, state } = responseHarness();
     await handler({ method: "GET", query: { address: account, symbol: "BTC-USDso" } } as never, res);
     expect(state.statusCode).toBe(200);
@@ -121,6 +128,10 @@ describe("GET /api/account-risk", () => {
 
   it("does not count an order-only active pool as an open position", async () => {
     mocks.getMarginAccount.mockResolvedValue(marginState([btcPool, ethPool]));
+    mocks.listPerpPositionAnalytics.mockResolvedValue([
+      { ...posFor(btcPool), ...metricsFor(btcPool), pool: btcPool },
+      { ...posFor(ethPool), ...metricsFor(ethPool), size: 0n, avgEntryPrice: 0n, pool: ethPool },
+    ]);
     mocks.getPerpPosition.mockImplementation(async (ref: { pool: string }) =>
       ref.pool === ethPool
         ? { size: 0n, avgEntryPrice: 0n }
@@ -144,8 +155,7 @@ describe("GET /api/account-risk", () => {
   it("preserves collateral visibility and suppresses liquidation verdicts when marks are stale", async () => {
     mocks.getMarginAccount.mockRejectedValue(new Error("oracle mark stale"));
     mocks.getPerpCollateralBasis.mockResolvedValue(7000000000000000000n);
-    mocks.listPerpPositions.mockResolvedValue([{ pool: btcPool, size: "100000" }]);
-    mocks.getPerpPositionAnalytics.mockResolvedValue({ priceable: false });
+    mocks.listPerpPositionAnalytics.mockResolvedValue([{ pool: btcPool, size: 100000n, priceable: false }]);
     mocks.getLiquidationPrice.mockRejectedValue(new Error("stale mark"));
     const { res, state } = responseHarness();
     await handler({ method: "GET", query: { address: account, symbol: "BTC-USDso" } } as never, res);
@@ -156,13 +166,15 @@ describe("GET /api/account-risk", () => {
     });
     expect(state.body.positions[0]).toMatchObject({
       priceable: false, markPrice: null, estimatedLiquidationPrice: null,
-      liquidationPriceStatus: "unavailable-stale-mark-or-rpc",
+      liquidationPriceStatus: "unavailable-stale-mark",
     });
+    expect(mocks.getLiquidationPrice).not.toHaveBeenCalled();
   });
 
   it("does not report an empty account when the indexer fallback fails", async () => {
     mocks.getMarginAccount.mockRejectedValue(new Error("oracle mark stale"));
     mocks.getPerpCollateralBasis.mockResolvedValue(7000000000000000000n);
+    mocks.listPerpPositionAnalytics.mockRejectedValue(new Error("bulk rpc offline"));
     mocks.listPerpPositions.mockRejectedValue(new Error("indexer offline"));
     const { res, state } = responseHarness();
     await handler({ method: "GET", query: { address: account, symbol: "BTC-USDso" } } as never, res);
