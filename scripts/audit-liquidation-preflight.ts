@@ -209,7 +209,13 @@ async function main(): Promise<void> {
       marginAccounts,
       positionsReadSucceeded: Array.isArray(positionsRaw),
       allMarketOrderReadsSucceeded: orderReadErrors.length === 0,
-      safeForLiveLiquidationTest: positions.length === 0 && openOrders.length === 0 && orderReadErrors.length === 0,
+      positionAndOrderStateClear: positions.length === 0 && openOrders.length === 0 && orderReadErrors.length === 0,
+      liveLiquidationTestAuthorized: false,
+      liveLiquidationTestBlockers: [
+        "Liquidation engine verified source/implementation is not yet established.",
+        "The stress model is not an exact cross-margin or liquidation-waterfall simulator.",
+        "A controlled liquidation requires a separately bounded test account/position and a verified recovery plan.",
+      ],
     };
     const hashGroups = new Map<string, string[]>();
     for (const item of bytecode as Array<Record<string, any>>) {
