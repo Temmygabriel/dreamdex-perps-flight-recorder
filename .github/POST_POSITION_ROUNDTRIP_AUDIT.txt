@@ -1,0 +1,1 @@
+One-shot marker: run the existing read-only Hideki liquidation preflight after the capped position round-trip. This file is not a transaction authorization.
