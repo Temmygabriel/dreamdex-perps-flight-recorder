@@ -23,6 +23,26 @@ async function getJson(path) {
   return response.json();
 }
 
+async function getJsonEventually(path, label) {
+  let lastError;
+  for (let attempt = 1; attempt <= 8; attempt++) {
+    try {
+      return await getJson(path);
+    } catch (error) {
+      lastError = error;
+      if (error?.status === 401 || error?.status === 403) {
+        throw new Error("Deployment endpoint is access-protected; configure VERCEL_AUTOMATION_BYPASS_SECRET to verify it.");
+      }
+      if (attempt < 8) {
+        console.log(label + " is not ready yet (attempt " + attempt + "/8): " +
+          (error instanceof Error ? error.message : "unknown error") + ". Retrying in 4 seconds.");
+        await wait(4_000);
+      }
+    }
+  }
+  throw new Error(label + " never became ready: " + (lastError instanceof Error ? lastError.message : "unknown error"));
+}
+
 async function probeRoot() {
   let result = { status: 0, finalUrl: base, stressLabBranding: false, contentType: "unavailable", headers: {}, html: "" };
   for (let attempt = 1; attempt <= 8; attempt++) {
@@ -141,7 +161,7 @@ async function main() {
     throw new Error("Order-book endpoint returned invalid, stale, or wrong-network data.");
   }
 
-  console.log("DEPLOYED READ-ONLY SMOKE CHECK PASSED");
+  console.log("Core market-list and order-book endpoints passed.");
   console.log(`Deployment: ${base}`);
   console.log(`Network: Somnia Hideki testnet (chain ID ${marketsPayload.network.chainId})`);
   console.log(`Live markets returned: ${marketsPayload.count}`);
@@ -150,12 +170,10 @@ async function main() {
   console.log("Price source: top-of-book midpoint, not the protocol mark price.");
   console.log("Quote timestamp: " + new Date(timestamp).toISOString());
 
-  let riskPayload;
-  try {
-    riskPayload = await getJson("/api/market-risk?symbol=" + encodeURIComponent(symbol));
-  } catch (error) {
-    throw new Error("Market risk endpoint failed: " + (error instanceof Error ? error.message : "unknown error"));
-  }
+  const riskPayload = await getJsonEventually(
+    "/api/market-risk?symbol=" + encodeURIComponent(symbol),
+    "Market risk endpoint",
+  );
   const risk = riskPayload.riskParameters;
   if (riskPayload.ok !== true || riskPayload.network?.chainId !== 50383 ||
       !Number.isFinite(Number(risk?.maintenanceMarginPercent)) ||
@@ -174,12 +192,10 @@ async function main() {
   // private key, wallet connection, or transaction. Empty-account behaviour is also
   // covered in deterministic mocked tests.
   const emptyAddress = "0x0000000000000000000000000000000000000000";
-  let accountPayload;
-  try {
-    accountPayload = await getJson("/api/account-risk?address=" + emptyAddress + "&symbol=" + encodeURIComponent(symbol));
-  } catch (error) {
-    throw new Error("Read-only account-risk endpoint failed: " + (error instanceof Error ? error.message : "unknown error"));
-  }
+  const accountPayload = await getJsonEventually(
+    "/api/account-risk?address=" + emptyAddress + "&symbol=" + encodeURIComponent(symbol),
+    "Read-only account-risk endpoint",
+  );
   if (accountPayload.ok !== true || accountPayload.network?.chainId !== 50383 ||
       accountPayload.readOnly !== true || accountPayload.signerRequired !== false ||
       !Array.isArray(accountPayload.positions) || typeof accountPayload.accountHealthAvailable !== "boolean") {
@@ -190,6 +206,7 @@ async function main() {
   }
   console.log("Read-only account risk passed: account health available " + accountPayload.accountHealthAvailable + "; positions returned " + accountPayload.positionCount + "; no transaction submitted.");
   console.log("Transaction submitted: no");
+  console.log("DEPLOYED READ-ONLY SMOKE CHECK PASSED");
 }
 
 main().catch((error) => {
