@@ -107,7 +107,11 @@ A separate [manually gated withdrawal workflow](.github/workflows/testnet-spot-w
 
 The security and failure-recovery campaign checklist is in [SECURITY_STRESS_WITHDRAWAL_TEST_PLAN.md](SECURITY_STRESS_WITHDRAWAL_TEST_PLAN.md). Deterministic model tests now include a multi-dimensional invariant grid. These tests validate the simplified scenario formulas; they do **not** prove dreamDEX liquidation-engine accuracy or every possible protocol security property.
 
-## Security and dependency audit\n\nCI now runs `npm audit --audit-level=high` and verifies the installed dependency tree. The repository currently has no committed `package-lock.json`; the audit job generates a temporary lockfile during CI. This detects known advisories for the resolved dependency tree in that run, but dependency versions are not yet reproducible across separate clean installs. Commit a reviewed lockfile before treating dependency resolution as fully reproducible. API handlers return generic upstream failure messages rather than exposing raw SDK exception strings.\n\n## Run checks
+## Security and dependency audit
+
+CI runs `npm audit --audit-level=high` and verifies the installed dependency tree. The repository currently has no committed `package-lock.json`; the audit job generates a temporary lockfile during CI. This detects known advisories for the resolved dependency tree in that run, but dependency versions are not yet reproducible across separate clean installs. Commit a reviewed lockfile before treating dependency resolution as fully reproducible. API handlers return generic upstream failure messages rather than exposing raw SDK exception strings.
+
+## Run checks
 
 Requires Node.js 20.19+.
 
