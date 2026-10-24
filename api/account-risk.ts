@@ -202,7 +202,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       maintenanceMarginRequirementUsdso: human(accountState.mmReq, quoteDecimals, "maintenance margin requirement"),
       closeOutMarginRequirementUsdso: human(accountState.cmReq, quoteDecimals, "close-out margin requirement"),
       marginStatus: String(accountState.marginStatus ?? "unknown"),
-      activePositionCount: positions.length,
+      activePositionCount: positionsFallbackUnavailable ? null : positions.length,
     } : {
       unlockedCollateralUsdso: null,
       lockedCollateralUsdso: null,
@@ -229,7 +229,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       positionsSource,
       positionsStatus: positionsFallbackUnavailable ? "unavailable" : "available",
       summary: accountSummary,
-      positionCount: positions.length,
+      positionCount: positionsFallbackUnavailable ? null : positions.length,
       positions,
       notes: [
         "Cross-margin account-level USDso is shared by positions in this MarginBank.",
