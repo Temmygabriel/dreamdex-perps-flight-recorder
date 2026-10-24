@@ -1,6 +1,11 @@
 name: Read-only Hideki liquidation preflight audit
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/liquidation-preflight-audit.yml"
+      - "scripts/audit-liquidation-preflight.ts"
   workflow_dispatch:
     inputs:
       confirm_read_only_audit:
@@ -22,14 +27,14 @@ concurrency:
 jobs:
   safety-stop:
     name: No audit authorized
-    if: inputs.confirm_read_only_audit != 'YES'
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm_read_only_audit != 'YES'
     runs-on: ubuntu-latest
     steps:
       - run: echo "No audit run. Select YES to run read-only account and deployment checks; no transactions will be submitted."
 
   read-only-audit:
     name: Inspect existing testnet account without transactions
-    if: inputs.confirm_read_only_audit == 'YES'
+    if: github.event_name == 'push' || inputs.confirm_read_only_audit == 'YES'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -50,7 +55,7 @@ jobs:
       - name: Run read-only liquidation preflight
         env:
           WALLET_KEY: ${{ secrets.wallet_key }}
-          CONFIRM_READ_ONLY_LIQUIDATION_AUDIT: ${{ inputs.confirm_read_only_audit }}
+          CONFIRM_READ_ONLY_LIQUIDATION_AUDIT: ${{ github.event_name == 'push' && 'YES' || inputs.confirm_read_only_audit }}
         run: npx tsx scripts/audit-liquidation-preflight.ts
 
       - name: Upload redacted audit receipt
