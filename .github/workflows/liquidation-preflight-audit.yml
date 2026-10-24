@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/liquidation-preflight-audit.yml"
       - "scripts/audit-liquidation-preflight.ts"
+      - "scripts/audit-liquidation-model.ts"
       - ".github/POST_POSITION_ROUNDTRIP_AUDIT.txt"
   workflow_dispatch:
     inputs:
@@ -59,11 +60,23 @@ jobs:
           CONFIRM_READ_ONLY_LIQUIDATION_AUDIT: ${{ github.event_name == 'push' && 'YES' || inputs.confirm_read_only_audit }}
         run: npx tsx scripts/audit-liquidation-preflight.ts
 
+      - name: Calibrate Stress Lab against live BTC risk parameters (read-only)
+        run: npm run audit:liquidation-model
+
       - name: Upload redacted audit receipt
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: hideki-read-only-liquidation-preflight
           path: artifacts/liquidation-preflight-audit.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload liquidation model calibration receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hideki-liquidation-model-calibration
+          path: artifacts/liquidation-model-calibration.json
           if-no-files-found: warn
           retention-days: 30
