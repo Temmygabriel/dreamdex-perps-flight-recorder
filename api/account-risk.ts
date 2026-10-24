@@ -142,6 +142,12 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       catch { positionReadStatus = "position-read-unavailable"; }
       try { analytics = await exchange.client.getPerpPositionAnalytics(ref) as AnyRow; }
       catch { positionReadStatus = "position-analytics-unavailable"; }
+
+      const sizeRaw = position?.size ?? analytics?.size;
+      // MarginBank.activePerpPools can include pools where the account only has orders.
+      // A zero position must not appear as an open risk row or trigger a liquidation-price read.
+      if (sizeRaw != null && toBigInt(sizeRaw, "position size") === 0n) return null;
+
       try {
         const price = await exchange.client.getLiquidationPrice(ref);
         liquidationPrice = price == null ? null : human(price, quoteDecimals, "liquidation price");
@@ -150,7 +156,6 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         liquidationPriceStatus = "unavailable-stale-mark-or-rpc";
       }
 
-      const sizeRaw = position?.size ?? analytics?.size;
       let quantity: string | null = null;
       let side: string = "unknown";
       if (sizeRaw != null) {
@@ -186,7 +191,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         estimatedLiquidationPrice: liquidationPrice,
         liquidationPriceStatus,
       };
-    }));
+    })).then((rows: Array<Record<string, unknown> | null>) => rows.filter((row): row is Record<string, unknown> => row !== null));
 
     const accountSummary = accountState ? {
       unlockedCollateralUsdso: human(accountState.unlockedCollateralBalance, quoteDecimals, "unlocked collateral"),
@@ -197,7 +202,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       maintenanceMarginRequirementUsdso: human(accountState.mmReq, quoteDecimals, "maintenance margin requirement"),
       closeOutMarginRequirementUsdso: human(accountState.cmReq, quoteDecimals, "close-out margin requirement"),
       marginStatus: String(accountState.marginStatus ?? "unknown"),
-      activePositionCount: activePools.length,
+      activePositionCount: positions.length,
     } : {
       unlockedCollateralUsdso: null,
       lockedCollateralUsdso: null,
@@ -207,7 +212,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       maintenanceMarginRequirementUsdso: null,
       closeOutMarginRequirementUsdso: null,
       marginStatus: accountHealthStatus,
-      activePositionCount: activePools.length,
+      activePositionCount: positions.length,
       collateralBasisUsdso: collateralBasis,
     };
 
