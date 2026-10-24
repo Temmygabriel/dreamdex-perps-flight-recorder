@@ -17,7 +17,8 @@
     "testnet:position-roundtrip": "tsx scripts/run-funded-position-roundtrip.ts",
     "testnet:spot-withdrawal": "tsx scripts/run-spot-withdrawal-roundtrip.ts",
     "check:protocol-reference": "tsx scripts/verify-protocol-reference.ts",
-    "audit:liquidation-model": "tsx scripts/audit-liquidation-model.ts"
+    "audit:liquidation-model": "tsx scripts/audit-liquidation-model.ts",
+    "inspect:proxy-implementations": "tsx scripts/inspect-hideki-proxy-implementations.ts"
   },
   "dependencies": {
     "@somnia-chain/markets-sdk": "0.32.1",
