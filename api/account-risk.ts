@@ -172,7 +172,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         side,
         quantityBase: quantity,
         entryPrice: position?.avgEntryPrice == null ? null : human(position.avgEntryPrice, quoteDecimals, "entry price"),
-        markPrice: priceable ? human(analytics.markPrice, quoteDecimals, "mark price") : null,
+        markPrice: priceable && analytics?.markPrice != null ? human(analytics.markPrice, quoteDecimals, "mark price") : null,
         notionalUsdso: field("notional"),
         unrealizedPnlUsdso: field("unrealizedPnl"),
         accruedFundingOwedUsdso: field("accruedFunding"),
