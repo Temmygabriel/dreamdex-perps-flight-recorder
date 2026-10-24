@@ -1,0 +1,11 @@
+One-shot authorization marker for the capped Hideki testnet BTC position round-trip.
+
+Safety bounds are enforced by scripts/run-funded-position-roundtrip.ts:
+- Hideki testnet chain ID 50383 only
+- Existing positions or BTC orders stop the run before funding/trading
+- At most 5 USDso margin top-up if unlocked margin is below 5
+- One BTC long MARKET order, target 12 USDso and hard cap 15 USDso
+- Immediate close attempt and post-run flat-state verification
+- No voucher claim; wallet key never printed or stored
+
+This file exists only to trigger one authorized run. Do not edit it again.
