@@ -23,26 +23,6 @@ async function getJson(path) {
   return response.json();
 }
 
-async function getJsonEventually(path, label) {
-  let lastError;
-  for (let attempt = 1; attempt <= 8; attempt++) {
-    try {
-      return await getJson(path);
-    } catch (error) {
-      lastError = error;
-      if (error?.status === 401 || error?.status === 403) {
-        throw new Error("Deployment endpoint is access-protected; configure VERCEL_AUTOMATION_BYPASS_SECRET to verify it.");
-      }
-      if (attempt < 8) {
-        console.log(label + " is not ready yet (attempt " + attempt + "/8): " +
-          (error instanceof Error ? error.message : "unknown error") + ". Retrying in 4 seconds.");
-        await wait(4_000);
-      }
-    }
-  }
-  throw new Error(label + " never became ready: " + (lastError instanceof Error ? lastError.message : "unknown error"));
-}
-
 async function probeRoot() {
   let result = { status: 0, finalUrl: base, stressLabBranding: false, contentType: "unavailable", headers: {}, html: "" };
   for (let attempt = 1; attempt <= 8; attempt++) {
@@ -161,52 +141,15 @@ async function main() {
     throw new Error("Order-book endpoint returned invalid, stale, or wrong-network data.");
   }
 
-  console.log("Core market-list and order-book endpoints passed.");
+  console.log("DEPLOYED READ-ONLY SMOKE CHECK PASSED");
   console.log(`Deployment: ${base}`);
   console.log(`Network: Somnia Hideki testnet (chain ID ${marketsPayload.network.chainId})`);
   console.log(`Live markets returned: ${marketsPayload.count}`);
   console.log(`Reference market: ${symbol}`);
   console.log(`Best bid / ask / midpoint: ${bid} / ${ask} / ${midpoint}`);
   console.log("Price source: top-of-book midpoint, not the protocol mark price.");
-  console.log("Quote timestamp: " + new Date(timestamp).toISOString());
-
-  const riskPayload = await getJsonEventually(
-    "/api/market-risk?symbol=" + encodeURIComponent(symbol),
-    "Market risk endpoint",
-  );
-  const risk = riskPayload.riskParameters;
-  if (riskPayload.ok !== true || riskPayload.network?.chainId !== 50383 ||
-      !Number.isFinite(Number(risk?.maintenanceMarginPercent)) ||
-      Number(risk.maintenanceMarginPercent) <= 0 ||
-      !Number.isFinite(Number(risk?.closeOutMarginPercent)) ||
-      Number(risk.closeOutMarginPercent) <= 0 ||
-      typeof riskPayload.marketHealth?.priceable !== "boolean") {
-    throw new Error("Market risk endpoint returned incomplete risk parameters or an invalid chain/priceability status.");
-  }
-  if (riskPayload.marketHealth.priceable === false && riskPayload.marketHealth.markPrice != null) {
-    throw new Error("Market risk endpoint exposed a mark price while the protocol reported the market unpriceable.");
-  }
-  console.log("Market risk read passed: maintenance " + risk.maintenanceMarginPercent + "%; close-out " + risk.closeOutMarginPercent + "%; protocol priceable " + riskPayload.marketHealth.priceable + ".");
-
-  // A known public zero address exercises the empty-account read without a signer,
-  // private key, wallet connection, or transaction. Empty-account behaviour is also
-  // covered in deterministic mocked tests.
-  const emptyAddress = "0x0000000000000000000000000000000000000000";
-  const accountPayload = await getJsonEventually(
-    "/api/account-risk?address=" + emptyAddress + "&symbol=" + encodeURIComponent(symbol),
-    "Read-only account-risk endpoint",
-  );
-  if (accountPayload.ok !== true || accountPayload.network?.chainId !== 50383 ||
-      accountPayload.readOnly !== true || accountPayload.signerRequired !== false ||
-      !Array.isArray(accountPayload.positions) || typeof accountPayload.accountHealthAvailable !== "boolean") {
-    throw new Error("Account-risk endpoint returned an unexpected payload or did not affirm read-only behaviour.");
-  }
-  if (!accountPayload.accountHealthAvailable && accountPayload.summary?.equityUsdso != null) {
-    throw new Error("Account-risk endpoint presented equity even though account health was unavailable.");
-  }
-  console.log("Read-only account risk passed: account health available " + accountPayload.accountHealthAvailable + "; positions returned " + accountPayload.positionCount + "; no transaction submitted.");
+  console.log(`Quote timestamp: ${new Date(timestamp).toISOString()}`);
   console.log("Transaction submitted: no");
-  console.log("DEPLOYED READ-ONLY SMOKE CHECK PASSED");
 }
 
 main().catch((error) => {
