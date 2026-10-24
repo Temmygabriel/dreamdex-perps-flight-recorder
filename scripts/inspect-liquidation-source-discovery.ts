@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { createPublicClient, http, type Hex, keccak256, toHex } from "viem";
+import { createPublicClient, http, type Hex, keccak256 } from "viem";
 import { hidekiTestnet } from "@somnia-chain/markets-sdk/chains";
 
 const TARGETS = [
