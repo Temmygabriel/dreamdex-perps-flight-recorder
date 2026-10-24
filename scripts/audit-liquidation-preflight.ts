@@ -48,9 +48,11 @@ async function main(): Promise<void> {
   if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) throw new Error("wallet_key must be a 32-byte EVM private key; key material will not be printed.");
   const account = privateKeyToAccount(privateKey);
   const publicClient = createPublicClient({ chain: hidekiTestnet, transport: http(RPC_URL, { timeout: 20000 }) });
+  // A signer is attached only so SDK account-scoped reads resolve this wallet.
+  // This script never invokes a write method and never broadcasts a transaction.
   const exchange: any = new SomniaMarkets({
     chain: hidekiTestnet, indexerUrl: INDEXER_URL, wsRpcUrl: WS_RPC_URL,
-    addresses: SOMNIA_HIDEKI_TESTNET_ADDRESSES,
+    addresses: SOMNIA_HIDEKI_TESTNET_ADDRESSES, privateKey,
   } as never);
   const report: Record<string, any> = {
     test: "read-only liquidation preflight audit",
