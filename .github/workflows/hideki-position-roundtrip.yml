@@ -1,0 +1,44 @@
+name: Hideki funded position round-trip
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  funded-position-roundtrip:
+    name: Funded BTC position open-close verification (Hideki testnet)
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/read-only-account-risk-check')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the tested branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install packages
+        run: npm install --no-audit --no-fund
+
+      - name: Open and close one capped BTC position on Hideki
+        env:
+          WALLET_KEY: ${{ secrets.wallet_key }}
+          CONFIRM_FUNDED_POSITION_E2E: YES
+        run: npm run testnet:position-roundtrip
+
+      - name: Preserve redacted transaction and final-state evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hideki-funded-position-roundtrip
+          path: artifacts/perps-stress-lab-position-roundtrip.json
+          if-no-files-found: warn
+          retention-days: 14
