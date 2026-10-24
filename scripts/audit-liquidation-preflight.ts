@@ -124,14 +124,31 @@ async function main(): Promise<void> {
     }
     const contracts = [EXPECTED.marginBank, EXPECTED.factory, EXPECTED.liquidationEngine, EXPECTED.insuranceFund];
     const bytecode: Record<string, unknown>[] = [];
+    // Some Hideki RPC nodes reject the symbolic "latest" block tag for eth_getCode.
+    // Pin reads to a concrete observed block, and preserve the account-state report if code inspection is unsupported.
+    const observedBlockNumber = await publicClient.getBlockNumber();
     for (const contract of contracts) {
-      const code = await publicClient.getBytecode({ address: contract as `0x${string}` });
-      bytecode.push({
-        address: contract,
-        deployed: Boolean(code && code !== "0x"),
-        byteLengthBytes: code && code !== "0x" ? (code.length - 2) / 2 : 0,
-        runtimeBytecodeKeccak256: code && code !== "0x" ? keccak256(code) : null,
-      });
+      try {
+        const code = await publicClient.getBytecode({
+          address: contract as `0x${string}`,
+          blockNumber: observedBlockNumber,
+        });
+        bytecode.push({
+          address: contract,
+          deployed: Boolean(code && code !== "0x"),
+          byteLengthBytes: code && code !== "0x" ? (code.length - 2) / 2 : 0,
+          runtimeBytecodeKeccak256: code && code !== "0x" ? keccak256(code) : null,
+          readError: null,
+        });
+      } catch (error) {
+        bytecode.push({
+          address: contract,
+          deployed: null,
+          byteLengthBytes: null,
+          runtimeBytecodeKeccak256: null,
+          readError: error instanceof Error ? error.message : "unknown eth_getCode failure",
+        });
+      }
     }
     report.chainId = chainId;
     report.account = account.address;
@@ -147,10 +164,11 @@ async function main(): Promise<void> {
       allMarketOrderReadsSucceeded: orderReadErrors.length === 0,
       safeForLiveLiquidationTest: positions.length === 0 && openOrders.length === 0 && orderReadErrors.length === 0,
     };
-    report.deployment = { systemConfigs, bytecode };
+    report.deployment = { observedBlockNumber: observedBlockNumber.toString(), systemConfigs, bytecode };
     report.verdict = {
       accountStateClean: positions.length === 0 && openOrders.length === 0 && orderReadErrors.length === 0,
-      allExpectedContractsHaveBytecode: bytecode.every((x: any) => x.deployed),
+      allExpectedContractsHaveBytecode: bytecode.every((x: any) => x.deployed === true),
+      bytecodeInspectionComplete: bytecode.every((x: any) => x.readError === null),
       publishedSystemWiringMatches: systemConfigs.every((x: any) => x.publishedAddressesMatch && x.fullyWired === true),
       liquidationEngineSourceVerified: false,
       liveLiquidationAttemptAuthorized: false,
