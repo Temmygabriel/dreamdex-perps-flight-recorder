@@ -177,6 +177,31 @@ async function main(): Promise<void> {
     report.nativeBalanceSTT = formatEther(nativeBalance);
     report.walletUsdso = formatUnits(walletUsdsoRaw, Number(btc.quoteDecimals ?? 18));
     report.marketCount = markets.length;
+    const marketRisk: Record<string, unknown> = {
+      baseSymbol: btc.baseSymbol ?? "BTC",
+      quoteSymbol: btc.quoteSymbol ?? "USDso",
+      poolAddress: btc.poolAddress ?? null,
+      marginBank: btc.marginBank ?? null,
+    };
+    try {
+      marketRisk.riskParams = clean(
+        await exchange.client.getPerpRiskParams(btc.poolAddress as `0x${string}`),
+      );
+      marketRisk.riskParamsReadSucceeded = true;
+    } catch (error) {
+      marketRisk.riskParamsReadSucceeded = false;
+      marketRisk.riskParamsReadError = error instanceof Error ? error.message : "unknown read failure";
+    }
+    try {
+      marketRisk.healthSnapshot = clean(
+        await exchange.client.getPerpHealthSnapshot(btc.poolAddress as `0x${string}`),
+      );
+      marketRisk.healthSnapshotReadSucceeded = true;
+    } catch (error) {
+      marketRisk.healthSnapshotReadSucceeded = false;
+      marketRisk.healthSnapshotReadError = error instanceof Error ? error.message : "unknown read failure";
+    }
+    report.marketRisk = marketRisk;
     report.accountState = {
       positions,
       openOrders,
