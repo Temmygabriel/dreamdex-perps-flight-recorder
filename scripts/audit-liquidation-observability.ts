@@ -57,12 +57,13 @@ async function main(): Promise<void> {
     const marginBank = String(btc.marginBank).toLowerCase();
     if (!/^0x[0-9a-f]{40}$/.test(marginBank)) throw new Error("BTC market has no valid MarginBank address.");
     const systemConfig = await exchange.client.getPerpSystemConfig(marginBank as `0x${string}`);
-    const [margin, health, positions, accountLiquidations, venueLiquidations, engineConfig, insuranceState] = await Promise.all([
+    const [margin, health, positions, accountLiquidations, venueLiquidations, venueAccountSummaries, engineConfig, insuranceState] = await Promise.all([
       exchange.client.getMarginAccount(marginBank as `0x${string}`, account.address),
       exchange.client.getAccountHealth(marginBank as `0x${string}`, account.address),
       exchange.client.listPerpPositionAnalytics({ marginBank: marginBank as `0x${string}`, account: account.address }),
       exchange.client.listLiquidations({ account: account.address, limit: 100 }),
       exchange.client.listLiquidations({ limit: 100 }),
+      exchange.client.listLiquidations({ kind: "AccountLiquidated", limit: 500 }),
       exchange.client.getLiquidationEngineConfig(systemConfig.liquidationEngine),
       exchange.client.getInsuranceFundState(systemConfig.insuranceFund),
     ]);
@@ -106,8 +107,22 @@ async function main(): Promise<void> {
       positions: clean(positions),
       positionLiquidationPrices,
     };
+    const stageRows = Array.isArray(venueAccountSummaries) ? venueAccountSummaries as Array<Record<string, any>> : [];
+    const stageDistribution: Record<string, number> = {};
+    const positionsProcessedDistribution: Record<string, number> = {};
+    for (const row of stageRows) {
+      const stage = row.stageReached === null || row.stageReached === undefined ? "missing" : String(row.stageReached);
+      stageDistribution[stage] = (stageDistribution[stage] ?? 0) + 1;
+      const processed = row.positionsProcessed === null || row.positionsProcessed === undefined ? "missing" : String(row.positionsProcessed);
+      positionsProcessedDistribution[processed] = (positionsProcessedDistribution[processed] ?? 0) + 1;
+    }
     report.liquidationEngine = {
       proxyAddress: systemConfig.liquidationEngine,
+      sampledAccountLiquidationRows: stageRows.length,
+      accountLiquidationSampleLimit: 500,
+      stageReachedDistribution: stageDistribution,
+      positionsProcessedDistribution,
+      noteOnSample: "These are the newest indexed AccountLiquidated rows returned by the SDK, capped at 500; this is not an exhaustive scan of all historical liquidation events.",
       config: clean(engineConfig),
       accountLiquidationEventCount: Array.isArray(accountLiquidations) ? accountLiquidations.length : null,
       accountLiquidationEvents: clean(accountLiquidations),
