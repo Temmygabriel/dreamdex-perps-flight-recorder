@@ -71,15 +71,16 @@ async function main(): Promise<void> {
       });
     }
     for (const base of EXPLORER_APIS) {
+      for (const action of ["getsourcecode", "getabi"]) {
       const sep = base.includes("?") ? "&" : "?";
-      const url = base + sep + "module=contract&action=getsourcecode&address=" + target.address;
+      const url = base + sep + "module=contract&action=" + action + "&address=" + target.address;
       const result = await getJson(url);
       const body = result.json as Record<string, any> | undefined;
       const rows = Array.isArray(body?.result) ? body.result : [];
       const row = rows[0] as Record<string, any> | undefined;
       sourceRows.push({
         target: target.name,
-        endpoint: base.includes("etherscan.io") ? "Etherscan-compatible API (no key)" : base.includes("/tokyo/") ? "Explorer Tokyo API" : "Explorer API",
+        endpoint: (base.includes("etherscan.io") ? "Etherscan-compatible API (no key)" : base.includes("/tokyo/") ? "Explorer Tokyo API" : "Explorer API") + " " + action,
         status: result.status,
         reachable: result.ok,
         apiStatus: body?.status ?? null,
@@ -88,8 +89,10 @@ async function main(): Promise<void> {
         contractName: row?.ContractName ?? null,
         abiReturned: Boolean(row?.ABI && String(row.ABI).startsWith("[")),
         abiEntryCount: row?.ABI && String(row.ABI).startsWith("[") ? (() => { try { return JSON.parse(row.ABI).length; } catch { return null; } })() : null,
+        resultPreview: row ? null : JSON.stringify(body?.result ?? body).slice(0, 350),
         error: result.error ?? null,
       });
+      }
     }
   }
   report.targets = targetRows;
