@@ -7,6 +7,7 @@ on:
       - ".github/workflows/liquidation-preflight-audit.yml"
       - "scripts/audit-liquidation-preflight.ts"
       - "scripts/audit-liquidation-model.ts"
+      - "scripts/inspect-hideki-proxy-implementations.ts"
       - ".github/POST_POSITION_ROUNDTRIP_AUDIT.txt"
   workflow_dispatch:
     inputs:
@@ -63,6 +64,9 @@ jobs:
       - name: Calibrate Stress Lab against live BTC risk parameters (read-only)
         run: npm run audit:liquidation-model
 
+      - name: Inspect proxy implementation slots (read-only)
+        run: npm run inspect:proxy-implementations
+
       - name: Upload redacted audit receipt
         if: always()
         uses: actions/upload-artifact@v4
@@ -78,5 +82,14 @@ jobs:
         with:
           name: hideki-liquidation-model-calibration
           path: artifacts/liquidation-model-calibration.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload proxy implementation inspection receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hideki-proxy-implementation-inspection
+          path: artifacts/hideki-proxy-implementation-inspection.json
           if-no-files-found: warn
           retention-days: 30
