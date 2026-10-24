@@ -37,11 +37,12 @@ function marketMatches(row: AnyRow, symbol: string): boolean {
   return normalizeSymbol(marketSymbol(row)) === wanted ||
     normalizeSymbol(String(row.baseSymbol ?? "") + "-" + String(row.quoteSymbol ?? "")) === wanted;
 }
-function unitCount(value: unknown): number | null {
-  try { return Number(toBigInt(value, "position size")); } catch { return null; }
-}
 function isValidSymbol(value: string): boolean {
   return /^[A-Z0-9][A-Z0-9:_/-]{1,39}$/i.test(value);
+}
+function isNonZeroPosition(row: AnyRow): boolean {
+  if (row.size == null) return true; // Keep an explicitly unknown row visible instead of inventing flatness.
+  return toBigInt(row.size, "position size") !== 0n;
 }
 
 export default async function handler(req: Req, res: Res): Promise<void> {
@@ -98,86 +99,116 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     let accountState: AnyRow | null = null;
     let collateralBasis: string | null = null;
     let accountHealthStatus = "available";
-    let positionsSource = "MarginBank active pools";
-    let activePools: string[] = [];
-    let positionsFallbackUnavailable = false;
-
     try {
       accountState = await exchange.client.getMarginAccount(marginBank, account) as AnyRow;
-      activePools = Array.isArray(accountState.activePerpPools)
-        ? accountState.activePerpPools.map((pool: unknown) => String(pool))
-        : [];
     } catch {
-      // Equity and health may fail when an oracle mark is stale. Collateral basis is a
-      // separate safe on-chain read and may still be available; never call that equity.
+      // Account equity/health may fail when an oracle mark is stale. Collateral basis
+      // is a different read and is never presented as equity.
       accountHealthStatus = "unavailable-stale-mark-or-rpc";
+      collateralBasis = human(
+        await exchange.client.getPerpCollateralBasis(marginBank, account),
+        quoteDecimals,
+        "collateral basis",
+      );
+    }
+
+    // This SDK bulk read returns all active positions at one pinned block. It also
+    // preserves a position's signed size/pool when a mark is stale and excludes closed
+    // positions from the live bank state. Use it before falling back to indexed rows.
+    let positionRows: AnyRow[] = [];
+    let positionsSource = "MarginBank analytics snapshot (single-block read)";
+    let positionsFallbackUnavailable = false;
+    try {
+      positionRows = await exchange.client.listPerpPositionAnalytics({ marginBank, account }) as AnyRow[];
+      positionRows = positionRows.filter(isNonZeroPosition);
+    } catch {
       positionsSource = "indexer fallback (may lag the chain)";
-      collateralBasis = human(await exchange.client.getPerpCollateralBasis(marginBank, account), quoteDecimals, "collateral basis");
       try {
         const indexed = await exchange.client.listPerpPositions(account) as AnyRow[];
-        activePools = indexed
+        positionRows = indexed
+          .filter(isNonZeroPosition)
           .filter((row) => {
-            const size = unitCount(row.size);
-            return size !== null && size !== 0;
+            const market = markets.find((item) =>
+              String(item.poolAddress ?? "").toLowerCase() === String(row.pool ?? row.poolAddress ?? "").toLowerCase()
+            );
+            // The requested market selects a MarginBank scope; don't mix indexed
+            // positions from a different bank into this cross-margin account.
+            return market != null && String(market.marginBank ?? "").toLowerCase() === marginBank.toLowerCase();
           })
-          .map((row) => String(row.pool ?? ""))
-          .filter((pool) => /^0x[0-9a-fA-F]{40}$/.test(pool));
+          .map((row) => ({ ...row, poolAddress: String(row.pool ?? row.poolAddress ?? ""), indexerOnly: true }));
       } catch {
         positionsFallbackUnavailable = true;
+        positionRows = [];
       }
     }
 
-    const positions = await Promise.all(activePools.map(async (poolAddress) => {
-      const market = markets.find((row) => String(row.poolAddress ?? "").toLowerCase() === poolAddress.toLowerCase());
-      const baseDecimals = Number(market?.baseDecimals ?? 18);
+    const mapped = await Promise.all(positionRows.map(async (row) => {
+      const poolAddress = String(row.poolAddress ?? row.pool ?? "");
+      if (!/^0x[0-9a-fA-F]{40}$/.test(poolAddress)) return null;
+      const market = markets.find((item) => String(item.poolAddress ?? "").toLowerCase() === poolAddress.toLowerCase());
       const symbol = market ? marketSymbol(market) : "Unknown market";
-      const ref = { marginBank, account, pool: poolAddress };
-      let position: AnyRow | null = null;
-      let analytics: AnyRow | null = null;
-      let positionReadStatus = "available";
-      let liquidationPrice: string | null = null;
-      let liquidationPriceStatus = "available";
+      const baseDecimals = Number(market?.baseDecimals ?? selected.baseDecimals ?? 18);
+      const positionQuoteDecimals = Number(market?.quoteDecimals ?? quoteDecimals);
+      if (!Number.isInteger(baseDecimals) || baseDecimals < 0 || baseDecimals > 36 ||
+          !Number.isInteger(positionQuoteDecimals) || positionQuoteDecimals < 0 || positionQuoteDecimals > 36) {
+        return null;
+      }
+      const positionBank = String(market?.marginBank ?? marginBank);
+      const ref = { marginBank: positionBank, account, pool: poolAddress };
+      let position: AnyRow | null = row.indexerOnly ? row : row;
+      let analytics: AnyRow | null = row.indexerOnly ? null : row;
+      let positionReadStatus = row.indexerOnly ? "indexer-only; may lag chain" : "available";
 
-      try { position = await exchange.client.getPerpPosition(ref) as AnyRow; }
-      catch { positionReadStatus = "position-read-unavailable"; }
-      try { analytics = await exchange.client.getPerpPositionAnalytics(ref) as AnyRow; }
-      catch { positionReadStatus = "position-analytics-unavailable"; }
-
-      const sizeRaw = position?.size ?? analytics?.size;
-      // MarginBank.activePerpPools can include pools where the account only has orders.
-      // A zero position must not appear as an open risk row or trigger a liquidation-price read.
-      if (sizeRaw != null && toBigInt(sizeRaw, "position size") === 0n) return null;
-
-      try {
-        const price = await exchange.client.getLiquidationPrice(ref);
-        liquidationPrice = price == null ? null : human(price, quoteDecimals, "liquidation price");
-        liquidationPriceStatus = price == null ? "not-applicable-flat-position" : "sdk-estimate";
-      } catch {
-        liquidationPriceStatus = "unavailable-stale-mark-or-rpc";
+      // The bulk analytics union carries size/pool on stale rows but may omit entry
+      // details. A direct position read can still provide the stored size/basis.
+      if (position.avgEntryPrice == null || position.size == null) {
+        try {
+          position = await exchange.client.getPerpPosition(ref) as AnyRow;
+          positionReadStatus = row.indexerOnly ? "indexer plus chain position read" : "chain position read supplemented missing analytics fields";
+        } catch {
+          if (!row.indexerOnly) positionReadStatus = "position-read-unavailable";
+        }
       }
 
-      let quantity: string | null = null;
-      let side: string = "unknown";
+      const sizeRaw = row.size ?? position?.size;
+      let quantityBase: string | null = null;
+      let side = "unknown";
       if (sizeRaw != null) {
         const size = toBigInt(sizeRaw, "position size");
-        side = size > 0n ? "long" : size < 0n ? "short" : "flat";
-        const absoluteSize = size < 0n ? -size : size;
-        quantity = formatUnits(absoluteSize, baseDecimals);
+        // Active pools can include pools with orders but no position. Filter them out
+        // even if an RPC fallback returned a zero-size row.
+        if (size === 0n) return null;
+        side = size > 0n ? "long" : "short";
+        quantityBase = formatUnits(size < 0n ? -size : size, baseDecimals);
       }
-      const priceable = analytics != null && analytics.priceable !== false &&
-        analytics.markPrice != null;
+
+      const priceable = analytics != null && analytics.priceable !== false && analytics.markPrice != null;
       const field = (key: string): string | null => {
         if (!priceable || analytics?.[key] == null) return null;
-        return human(analytics[key], quoteDecimals, key);
+        return human(analytics[key], positionQuoteDecimals, key);
       };
+
+      let liquidationPrice: string | null = null;
+      let liquidationPriceStatus = "unavailable-stale-mark-or-rpc";
+      if (analytics?.priceable === false) {
+        liquidationPriceStatus = "unavailable-stale-mark";
+      } else {
+        try {
+          const price = await exchange.client.getLiquidationPrice(ref);
+          liquidationPrice = price == null ? null : human(price, positionQuoteDecimals, "liquidation price");
+          liquidationPriceStatus = price == null ? "not-applicable-flat-position" : "sdk-estimate";
+        } catch {
+          liquidationPriceStatus = "unavailable-stale-mark-or-rpc";
+        }
+      }
 
       return {
         symbol,
         poolAddress,
         side,
-        quantityBase: quantity,
-        entryPrice: position?.avgEntryPrice == null ? null : human(position.avgEntryPrice, quoteDecimals, "entry price"),
-        markPrice: priceable && analytics?.markPrice != null ? human(analytics.markPrice, quoteDecimals, "mark price") : null,
+        quantityBase,
+        entryPrice: position?.avgEntryPrice == null ? null : human(position.avgEntryPrice, positionQuoteDecimals, "entry price"),
+        markPrice: priceable && analytics?.markPrice != null ? human(analytics.markPrice, positionQuoteDecimals, "mark price") : null,
         notionalUsdso: field("notional"),
         unrealizedPnlUsdso: field("unrealizedPnl"),
         accruedFundingOwedUsdso: field("accruedFunding"),
@@ -191,7 +222,8 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         estimatedLiquidationPrice: liquidationPrice,
         liquidationPriceStatus,
       };
-    })).then((rows: Array<Record<string, unknown> | null>) => rows.filter((row): row is Record<string, unknown> => row !== null));
+    }));
+    const positions = mapped.filter((row): row is NonNullable<typeof row> => row !== null);
 
     const accountSummary = accountState ? {
       unlockedCollateralUsdso: human(accountState.unlockedCollateralBalance, quoteDecimals, "unlocked collateral"),
@@ -212,7 +244,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       maintenanceMarginRequirementUsdso: null,
       closeOutMarginRequirementUsdso: null,
       marginStatus: accountHealthStatus,
-      activePositionCount: positions.length,
+      activePositionCount: positionsFallbackUnavailable ? null : positions.length,
       collateralBasisUsdso: collateralBasis,
     };
 
@@ -227,14 +259,15 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       accountHealthAvailable: accountState !== null,
       accountHealthStatus,
       positionsSource,
-      positionsStatus: positionsFallbackUnavailable ? "unavailable" : "available",
+      positionsStatus: positionsFallbackUnavailable ? "unavailable" : positionsSource.startsWith("indexer") ? "indexed-fallback" : "available",
       summary: accountSummary,
       positionCount: positionsFallbackUnavailable ? null : positions.length,
       positions,
       notes: [
-        "Cross-margin account-level USDso is shared by positions in this MarginBank.",
+        "Cross-margin account-level USDso is shared by positions within this MarginBank.",
         "Liquidation price is the SDK estimate for that market moving alone while the account's other market contributions are held constant.",
         "A stale mark or RPC error makes the estimate unavailable; an unavailable value is never represented as zero.",
+        "Index-only fallback rows may lag the current chain and are labeled as such.",
         "This endpoint performs read-only queries. It never signs or submits a transaction.",
       ],
     });
