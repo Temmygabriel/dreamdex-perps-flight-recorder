@@ -8,7 +8,7 @@ const RPC_URL = "https://api.hideki2.infra.testnet.somnia.network";
 const INDEXER_URL = process.env.HIDEKI_INDEXER_URL ?? "https://hideki-dev.smk.somnia.host/v1/graphql";
 const WS_RPC_URL = "wss://api.hideki2.infra.testnet.somnia.network/ws";
 const EXPECTED = {
-  marginBank: "0x478769e1177c0773c43a593dcc4ad15f15f1394",
+  marginBank: "0x478769e1177c0773c43a593dccc4ad15f15f1394",
   collateral: "0xed7993a74dae1e6656b704a424dcd8711aaf4f72",
   factory: "0xe631faee547baee07353e290f0562ea67d856560",
   liquidationEngine: "0xa66d3c24ad4a389d863846905d8173e1017e9f4d",
@@ -90,13 +90,19 @@ async function main(): Promise<void> {
         liquidationEngine: address(config.liquidationEngine, "configured liquidation engine"),
         insuranceFund: address(config.insuranceFund, "configured insurance fund"),
       };
+      const addressMismatches = [
+        ...(bank !== EXPECTED.marginBank ? ["marginBank"] : []),
+        ...(actual.collateral !== EXPECTED.collateral ? ["collateral"] : []),
+        ...(actual.factory !== EXPECTED.factory ? ["factory"] : []),
+        ...(actual.liquidationEngine !== EXPECTED.liquidationEngine ? ["liquidationEngine"] : []),
+        ...(actual.insuranceFund !== EXPECTED.insuranceFund ? ["insuranceFund"] : []),
+      ];
       systemConfigs.push({
         marginBank: bank,
         fullyWired: config.fullyWired ?? null,
         actual,
-        publishedAddressesMatch: bank === EXPECTED.marginBank &&
-          actual.collateral === EXPECTED.collateral && actual.factory === EXPECTED.factory &&
-          actual.liquidationEngine === EXPECTED.liquidationEngine && actual.insuranceFund === EXPECTED.insuranceFund,
+        addressMismatches,
+        publishedAddressesMatch: addressMismatches.length === 0,
       });
     }
     const openOrders: Record<string, unknown>[] = [];
