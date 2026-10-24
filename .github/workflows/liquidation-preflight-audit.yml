@@ -8,6 +8,7 @@ on:
       - "scripts/audit-liquidation-preflight.ts"
       - "scripts/audit-liquidation-model.ts"
       - "scripts/inspect-hideki-proxy-implementations.ts"
+      - "scripts/audit-liquidation-observability.ts"
       - ".github/POST_POSITION_ROUNDTRIP_AUDIT.txt"
   workflow_dispatch:
     inputs:
@@ -66,6 +67,21 @@ jobs:
 
       - name: Inspect proxy implementation slots (read-only)
         run: npm run inspect:proxy-implementations
+
+      - name: Read current account health, liquidation estimates, event history and waterfall configuration (read-only)
+        env:
+          WALLET_KEY: ${{ secrets.wallet_key }}
+          CONFIRM_READ_ONLY_LIQUIDATION_AUDIT: YES
+        run: npx tsx scripts/audit-liquidation-observability.ts
+
+      - name: Upload liquidation observability receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hideki-liquidation-observability-audit
+          path: artifacts/liquidation-observability-audit.json
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Upload redacted audit receipt
         if: always()
