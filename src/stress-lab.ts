@@ -293,7 +293,7 @@ async function runAccountRisk(){
   const symbol=val("market");
   const url="/api/account-risk?address="+encodeURIComponent(address)+"&symbol="+encodeURIComponent(symbol);
   const response=await fetch(url,{headers:{accept:"application/json"},cache:"no-store",signal:AbortSignal.timeout(25000)});
-  const payload=await response.json() as {ok?:boolean;error?:string;readAt?:string;accountHealthAvailable?:boolean;accountHealthStatus?:string;positionsStatus?:string;positionsSource?:string;summary?:Record<string,unknown>;positions?:unknown;positionCount?:number;network?:{chainId?:number};marketScope?:{symbol?:string}};
+  const payload=await response.json() as {ok?:boolean;error?:string;readAt?:string;accountHealthAvailable?:boolean;accountHealthStatus?:string;positionsStatus?:string;positionsSource?:string;summary?:Record<string,unknown>;positions?:unknown;positionCount?:number|null;network?:{chainId?:number};marketScope?:{symbol?:string}};
   if(requestId!==accountRiskRequestId)return;
   if(!response.ok||!payload.ok)throw new Error(payload.error??"The account-risk endpoint did not return a usable snapshot.");
   const summary=payload.summary??{};
@@ -306,7 +306,7 @@ async function runAccountRisk(){
   setText("account-risk-im",amount("initialMarginRequirementUsdso"));
   setText("account-risk-mm",amount("maintenanceMarginRequirementUsdso"));
   setText("account-risk-cm",amount("closeOutMarginRequirementUsdso"));
-  setText("account-risk-position-count",String(payload.positionCount??0));
+  setText("account-risk-position-count",payload.positionsStatus==="unavailable"?"Unavailable":String(payload.positionCount??0));
   setText("account-risk-health-badge",String(summary.marginStatus??payload.accountHealthStatus??"unknown"));
   setText("account-risk-position-source",payload.positionsSource?.toLowerCase().includes("indexer")?"INDEXER FALLBACK":"ON-CHAIN");
   renderAccountPositions(payload.positions,payload.positionsStatus??"available");
