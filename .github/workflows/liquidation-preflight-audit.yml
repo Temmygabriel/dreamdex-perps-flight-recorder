@@ -1,0 +1,63 @@
+name: Read-only Hideki liquidation preflight audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_read_only_audit:
+        description: "This audit reads wallet, positions, orders and contract deployment only. It sends no transactions."
+        required: true
+        type: choice
+        options:
+          - "NO"
+          - "YES"
+        default: "NO"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perps-liquidation-read-only-audit
+  cancel-in-progress: false
+
+jobs:
+  safety-stop:
+    name: No audit authorized
+    if: inputs.confirm_read_only_audit != 'YES'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "No audit run. Select YES to run read-only account and deployment checks; no transactions will be submitted."
+
+  read-only-audit:
+    name: Inspect existing testnet account without transactions
+    if: inputs.confirm_read_only_audit == 'YES'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install project dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run read-only liquidation preflight
+        env:
+          WALLET_KEY: ${{ secrets.wallet_key }}
+          CONFIRM_READ_ONLY_LIQUIDATION_AUDIT: ${{ inputs.confirm_read_only_audit }}
+        run: npx tsx scripts/audit-liquidation-preflight.ts
+
+      - name: Upload redacted audit receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hideki-read-only-liquidation-preflight
+          path: artifacts/liquidation-preflight-audit.json
+          if-no-files-found: warn
+          retention-days: 30
