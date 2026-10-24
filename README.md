@@ -2,9 +2,9 @@
 
 **Stress-test your position before you trade.**
 
-Perps Stress Lab is a scenario explorer for dreamDEX Perps on Somnia Hideki testnet. Configure a hypothetical single-position scenario, apply an adverse or favourable price move, inspect estimated P&L/equity/maintenance headroom, and export a transparent JSON scenario report.
+Perps Stress Lab is a read-only risk explorer for dreamDEX Perps on Somnia Hideki/Tokyo testnet. It combines two separate tools: (1) a hypothetical position stress lab that lets users apply market shocks and inspect the maths, and (2) a public-address Account Risk Check that reads live cross-margin collateral, margin requirements, open positions, and SDK liquidation-price estimates. The app never asks for a private key or signs a transaction.
 
-> **Important:** This is a simplified educational stress model, not a liquidation-price calculator, financial advice, or proof of protocol liquidation behaviour. dreamDEX testnet uses cross margin by default, so positions share account-level USDso collateral. This app models one hypothetical position only; it does not query or calculate the live account's shared collateral, other positions, or account-wide maintenance. Position size, starting margin, maintenance and shock assumptions are user-controlled. The entry price is prefilled from the selected live top-of-book midpoint when available and remains editable. The midpoint is not the protocol mark price.
+> **Important:** The stress slider is a hypothetical single-position model; it is not a liquidation calculator and its maintenance percentage remains an explicit scenario assumption. Separately, the Account Risk Check reads actual account-level cross-margin information from the SDK when available. That account view can show current equity and account-wide requirements, and estimate a liquidation price for each active market. An SDK liquidation-price estimate holds the other markets' contributions constant and is not a guarantee of liquidation execution. Missing/stale marks or RPC/indexer errors are shown as unavailable, never as zero or as a healthy status. The entry price in the hypothetical lab may be prefilled from a live top-of-book midpoint; that midpoint is not the protocol mark price.
 
 ## Current MVP
 
@@ -16,7 +16,11 @@ Perps Stress Lab is a scenario explorer for dreamDEX Perps on Somnia Hideki test
 - Deterministic formula trace for stressed price, directional P&L, estimated equity, and estimated maintenance. Monetary figures are quote-unit estimates (USDso-equivalent), not withdrawable cash or guaranteed execution prices.
 - Extracted pure calculation model with tests for long/short symmetry, linear quantity scaling, funding signs, zero and total-loss shocks, headroom invariants, invalid inputs, and arithmetic overflow.
 - JSON export with inputs, outputs, assumptions, chain context and explicit `onChain: false` / `liveAccountDataUsed: false` verification flags.
-- Reads live Hideki market definitions through `/api/markets` and requests the selected market’s top-of-book bid/ask midpoint through `/api/market-price`. The midpoint is explicitly **not** represented as the protocol mark price. If either endpoint is unavailable, manual scenarios remain available.
+- Reads live Hideki market definitions through `/api/markets` and requests a selected market’s top-of-book bid/ask midpoint through `/api/market-price`. The midpoint is explicitly **not** represented as the protocol mark price. If either endpoint is unavailable, manual scenarios remain available.
+- Reads per-market initial-margin floor, effective initial margin, maintenance margin, close-out margin, fee parameters, position-size limit, and protocol mark-price availability via `/api/market-risk`.
+- Provides a **read-only Account Risk Check** at `/api/account-risk`: enter a public EVM wallet address to read MarginBank equity, unlocked/locked/withdrawable collateral, account-wide initial/maintenance/close-out requirements, and positions with mark/PNL/funding/margin contributions. No private key or wallet connection is required.
+- Uses the SDK `getLiquidationPrice()` estimate per active market where the required risk/mark data are available. It labels that estimate as market-at-a-time with other market contributions held constant, never as a liquidation guarantee.
+- Handles empty accounts, multiple open positions, stale/unpriceable marks, and endpoint failures explicitly. When account health cannot be computed, the UI suppresses equity/health verdicts and may show collateral basis separately as **not equity**.
 
 ## Calculation model
 
@@ -39,6 +43,22 @@ Optional funding uses the documented sign and settlement cadence: the rate is qu
 - Perps SDK pinned in `package.json`: `@somnia-chain/markets-sdk@0.32.1`
 - The browser app does not need a private key or mainnet funds. Optional CI readiness checks use the GitHub Actions `wallet_key` secret only for read-only steps.
 
+## Read-only Account Risk Check
+
+The account feature is separate from the hypothetical stress calculator. It accepts a **public wallet address only** and uses read-only SDK calls on Somnia Hideki:
+
+- `getMarginAccount()` reads the MarginBank cross-margin snapshot: account equity, unlocked and locked collateral, withdrawable funds, and initial/maintenance/close-out requirements.
+- `listPerpPositionAnalytics({ marginBank, account })` reads the account's open positions and their mark/P&L/funding/margin contributions at a single pinned block, so the positions table does not combine rows from different chain heights. The UI filters zero-size pools because MarginBank active pools can also contain order-only pools. `getPerpPosition()` is used only to supplement stored position basis/size when a stale-mark analytics row omits those fields.
+- `getLiquidationPrice()` provides an SDK-derived price estimate for that market moving against the account while contributions from other markets are held constant.
+- `getPerpRiskParams()` and `getPerpHealthSnapshot()` expose market-specific risk parameters and whether the protocol currently considers the market priceable.
+- If a stale mark prevents a full margin/health read, the API attempts to read collateral basis separately. Bulk position analytics can still preserve a position's signed size when its mark is stale; if the chain positions read is unavailable, the API falls back to indexer position rows and labels the result as potentially lagging. Collateral basis is not presented as account equity. If both the chain and indexer position sources fail, the UI shows position count as unavailable rather than zero.
+- The endpoints are read-only and do not sign or submit transactions. Do not enter a seed phrase or private key.
+
+**Interpretation and limits:** `getLiquidationPrice()` is an SDK estimate, not a prediction that the LiquidationEngine will successfully execute a close. A scenario in another market can change the shared cross-margin account state, so this is not a simultaneous portfolio-wide crash simulation. A missing/stale mark, RPC failure, or unavailable indexer yields an unavailable result, not zero, not a healthy status, and not a liquidation verdict.
+
+**API routes:** `GET /api/market-risk?symbol=BTC-USDso` and `GET /api/account-risk?address=0x…&symbol=BTC-USDso`.
+
+
 ## Verification status
 
 **The current branch is an implementation in progress.** Do not describe it as fully verified against Hideki until the following have been demonstrated:
@@ -47,13 +67,13 @@ Optional funding uses the documented sign and settlement cadence: the rate is qu
 - [x] The production URL `https://perp-stress-lab.vercel.app` returns the live Hideki market list and a fresh BTC top-of-book midpoint. The midpoint is not the protocol mark price; preview verification is still skipped when Vercel preview protection blocks anonymous access.
 - [x] Formula tests validate long/short symmetry, funding direction, quantity scaling, total-loss shock, headroom invariants, invalid inputs, and overflow protection.
 - [x] CI performs a read-only Perps account readiness check: voucher eligibility and SDK max-order-size gate, without signing or sending a transaction.
-- [ ] Any account-aware stress mode is implemented only after the SDK exposes the required Perps account data and it is validated against the protocol.
+- [x] A separate read-only Account Risk Check uses SDK MarginBank cross-margin views, per-position analytics and SDK liquidation-price estimates; it does not sign or submit transactions. See the edge-case test suite and deployment verification below.
 - [x] Funded testnet position lifecycle passed using the existing `wallet_key`: transferred 5 USDso from the wallet into Perps margin, opened a BTC long MARKET position of 0.00014 BTC (guarded notional below 15 USDso), closed it, and verified no BTC position remained. Deposit, entry, and exit transaction hashes are recorded in the redacted workflow receipt. The position round-trip reduced the final Perps balance by about 0.000182 USDso from entry/exit price movement; no real funds were involved.
 - [ ] Public Vercel deployment is tested on desktop and mobile.
-- [x] Playwright browser tests cover live-price prefill, long/short P&L direction, honest JSON export flags, 360–390px mobile layout, and persisted light/dim theme switching.
+- [x] Playwright browser tests cover live-price prefill and stale-quote rejection, live protocol risk display/stale-mark handling, public-address Account Risk Check, multiple positions, API failure states, long/short P&L direction, honest JSON export flags, mobile layout, and persisted light/dim theme switching.
 - [ ] Deployed preview smoke check confirms the Vercel serverless endpoints are live and returning fresh Hideki data. The preview is currently access-protected; the preview check reports a skip unless `VERCEL_AUTOMATION_BYPASS_SECRET` is configured in GitHub Actions. A separate read-only check now also runs against the production URL after pushes to main.
 
-A successful market read does not validate the stress model. A successful order does not prove liquidation accuracy. Funding is calculated as one eighth of the quoted 8-hour rate per hourly settlement, matching the public documentation's example, but assumes a constant rate and entry notional. The public documentation says cross margin is the default: positions share one USDso account balance and maintenance is account-wide. The app intentionally remains a single-position scenario, so it must not label a negative headroom result as a protocol liquidation verdict. The new protocol-reference tests check the published 5x/10x/20x margin tiers and the official hourly funding example. A live read-only script checks chain ID and MarginBank wiring against published Hideki addresses. Neither step proves the internal LiquidationEngine execution path; that requires contract-source verification or a controlled fork/stateful test harness.
+A successful market read does not validate the hypothetical stress formula. Funding in the scenario lab uses one eighth of the quoted 8-hour rate per hourly settlement and holds the rate/notional constant. dreamDEX uses cross margin by default: positions share one USDso balance and maintenance is account-wide. The scenario calculator remains a transparent single-position what-if tool; the separate Account Risk Check uses SDK account views but is not a portfolio-wide simultaneous-crash model. Its liquidation price is the SDK's estimate with other market contributions held constant, not proof of LiquidationEngine execution. Protocol-reference tests check published margin tiers and funding examples; a live read-only script checks chain ID and MarginBank wiring. None of these steps substitutes for source verification or a controlled fork/stateful execution test.
 
 ## Manual funded testnet position lifecycle (verified)
 
@@ -87,7 +107,11 @@ A separate [manually gated withdrawal workflow](.github/workflows/testnet-spot-w
 
 The security and failure-recovery campaign checklist is in [SECURITY_STRESS_WITHDRAWAL_TEST_PLAN.md](SECURITY_STRESS_WITHDRAWAL_TEST_PLAN.md). Deterministic model tests now include a multi-dimensional invariant grid. These tests validate the simplified scenario formulas; they do **not** prove dreamDEX liquidation-engine accuracy or every possible protocol security property.
 
-## Security and dependency audit\n\nCI now runs `npm audit --audit-level=high` and verifies the installed dependency tree. The repository currently has no committed `package-lock.json`; the audit job generates a temporary lockfile during CI. This detects known advisories for the resolved dependency tree in that run, but dependency versions are not yet reproducible across separate clean installs. Commit a reviewed lockfile before treating dependency resolution as fully reproducible. API handlers return generic upstream failure messages rather than exposing raw SDK exception strings.\n\n## Run checks
+## Security and dependency audit
+
+CI runs `npm audit --audit-level=high` and verifies the installed dependency tree. The repository currently has no committed `package-lock.json`; the audit job generates a temporary lockfile during CI. This detects known advisories for the resolved dependency tree in that run, but dependency versions are not yet reproducible across separate clean installs. Commit a reviewed lockfile before treating dependency resolution as fully reproducible. API handlers return generic upstream failure messages rather than exposing raw SDK exception strings.
+
+## Run checks
 
 Requires Node.js 20.19+.
 

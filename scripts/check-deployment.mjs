@@ -148,7 +148,47 @@ async function main() {
   console.log(`Reference market: ${symbol}`);
   console.log(`Best bid / ask / midpoint: ${bid} / ${ask} / ${midpoint}`);
   console.log("Price source: top-of-book midpoint, not the protocol mark price.");
-  console.log(`Quote timestamp: ${new Date(timestamp).toISOString()}`);
+  console.log("Quote timestamp: " + new Date(timestamp).toISOString());
+
+  let riskPayload;
+  try {
+    riskPayload = await getJson("/api/market-risk?symbol=" + encodeURIComponent(symbol));
+  } catch (error) {
+    throw new Error("Market risk endpoint failed: " + (error instanceof Error ? error.message : "unknown error"));
+  }
+  const risk = riskPayload.riskParameters;
+  if (riskPayload.ok !== true || riskPayload.network?.chainId !== 50383 ||
+      !Number.isFinite(Number(risk?.maintenanceMarginPercent)) ||
+      Number(risk.maintenanceMarginPercent) <= 0 ||
+      !Number.isFinite(Number(risk?.closeOutMarginPercent)) ||
+      Number(risk.closeOutMarginPercent) <= 0 ||
+      typeof riskPayload.marketHealth?.priceable !== "boolean") {
+    throw new Error("Market risk endpoint returned incomplete risk parameters or an invalid chain/priceability status.");
+  }
+  if (riskPayload.marketHealth.priceable === false && riskPayload.marketHealth.markPrice != null) {
+    throw new Error("Market risk endpoint exposed a mark price while the protocol reported the market unpriceable.");
+  }
+  console.log("Market risk read passed: maintenance " + risk.maintenanceMarginPercent + "%; close-out " + risk.closeOutMarginPercent + "%; protocol priceable " + riskPayload.marketHealth.priceable + ".");
+
+  // A known public zero address exercises the empty-account read without a signer,
+  // private key, wallet connection, or transaction. Empty-account behaviour is also
+  // covered in deterministic mocked tests.
+  const emptyAddress = "0x0000000000000000000000000000000000000000";
+  let accountPayload;
+  try {
+    accountPayload = await getJson("/api/account-risk?address=" + emptyAddress + "&symbol=" + encodeURIComponent(symbol));
+  } catch (error) {
+    throw new Error("Read-only account-risk endpoint failed: " + (error instanceof Error ? error.message : "unknown error"));
+  }
+  if (accountPayload.ok !== true || accountPayload.network?.chainId !== 50383 ||
+      accountPayload.readOnly !== true || accountPayload.signerRequired !== false ||
+      !Array.isArray(accountPayload.positions) || typeof accountPayload.accountHealthAvailable !== "boolean") {
+    throw new Error("Account-risk endpoint returned an unexpected payload or did not affirm read-only behaviour.");
+  }
+  if (!accountPayload.accountHealthAvailable && accountPayload.summary?.equityUsdso != null) {
+    throw new Error("Account-risk endpoint presented equity even though account health was unavailable.");
+  }
+  console.log("Read-only account risk passed: account health available " + accountPayload.accountHealthAvailable + "; positions returned " + accountPayload.positionCount + "; no transaction submitted.");
   console.log("Transaction submitted: no");
 }
 
