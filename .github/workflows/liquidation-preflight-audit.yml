@@ -9,6 +9,7 @@ on:
       - "scripts/audit-liquidation-model.ts"
       - "scripts/inspect-hideki-proxy-implementations.ts"
       - "scripts/audit-liquidation-observability.ts"
+      - "scripts/inspect-liquidation-source-discovery.ts"
       - ".github/POST_POSITION_ROUNDTRIP_AUDIT.txt"
   workflow_dispatch:
     inputs:
@@ -67,6 +68,18 @@ jobs:
 
       - name: Inspect proxy implementation slots (read-only)
         run: npm run inspect:proxy-implementations
+
+      - name: Probe authoritative implementation source and ABI endpoints (read-only)
+        run: npx tsx scripts/inspect-liquidation-source-discovery.ts
+
+      - name: Upload source discovery receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hideki-liquidation-source-discovery
+          path: artifacts/liquidation-source-discovery.json
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Read current account health, liquidation estimates, event history and waterfall configuration (read-only)
         env:
