@@ -160,6 +160,21 @@ describe("GET /api/account-risk", () => {
     });
   });
 
+  it("does not report an empty account when the indexer fallback fails", async () => {
+    mocks.getMarginAccount.mockRejectedValue(new Error("oracle mark stale"));
+    mocks.getPerpCollateralBasis.mockResolvedValue(7000000000000000000n);
+    mocks.listPerpPositions.mockRejectedValue(new Error("indexer offline"));
+    const { res, state } = responseHarness();
+    await handler({ method: "GET", query: { address: account, symbol: "BTC-USDso" } } as never, res);
+    expect(state.statusCode).toBe(200);
+    expect(state.body.accountHealthAvailable).toBe(false);
+    expect(state.body.positionsStatus).toBe("unavailable");
+    expect(state.body.positionCount).toBeNull();
+    expect(state.body.summary).toMatchObject({
+      equityUsdso: null, collateralBasisUsdso: "7", activePositionCount: null,
+    });
+  });
+
   it("returns a safe 502 when indexer data is unavailable", async () => {
     mocks.listPerpMarkets.mockRejectedValue(new Error("private indexer endpoint"));
     const { res, state } = responseHarness();
