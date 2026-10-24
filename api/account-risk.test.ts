@@ -119,6 +119,28 @@ describe("GET /api/account-risk", () => {
     expect(mocks.getLiquidationPrice).toHaveBeenCalledWith({ marginBank: bank, account, pool: btcPool });
   });
 
+  it("does not count an order-only active pool as an open position", async () => {
+    mocks.getMarginAccount.mockResolvedValue(marginState([btcPool, ethPool]));
+    mocks.getPerpPosition.mockImplementation(async (ref: { pool: string }) =>
+      ref.pool === ethPool
+        ? { size: 0n, avgEntryPrice: 0n }
+        : posFor(ref.pool)
+    );
+    mocks.getPerpPositionAnalytics.mockImplementation(async (ref: { pool: string }) =>
+      ref.pool === ethPool
+        ? { size: 0n, priceable: true, markPrice: 2000000000000000000000n }
+        : metricsFor(ref.pool)
+    );
+    const { res, state } = responseHarness();
+    await handler({ method: "GET", query: { address: account, symbol: "BTC-USDso" } } as never, res);
+    expect(state.statusCode).toBe(200);
+    expect(state.body.positions.map((row: any) => row.symbol)).toEqual(["BTC-USDso"]);
+    expect(state.body.positionCount).toBe(1);
+    expect(state.body.summary.activePositionCount).toBe(1);
+    expect(mocks.getLiquidationPrice).toHaveBeenCalledTimes(1);
+    expect(mocks.getLiquidationPrice).toHaveBeenCalledWith({ marginBank: bank, account, pool: btcPool });
+  });
+
   it("preserves collateral visibility and suppresses liquidation verdicts when marks are stale", async () => {
     mocks.getMarginAccount.mockRejectedValue(new Error("oracle mark stale"));
     mocks.getPerpCollateralBasis.mockResolvedValue(7000000000000000000n);
