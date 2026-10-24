@@ -35,10 +35,10 @@ function compute(){
     fundingEnabled:x.fundingEnabled, fundingRate8hPercent:x.fundingRate, fundingPeriods:x.periods
   });
   const assumptions=[
-    "One isolated position only; no cross-margin offsets or other positions.",
+    "One hypothetical position only; dreamDEX uses cross margin by default, and this model omits account-wide collateral and offsets from other positions.",
     "Estimated equity = starting margin + directional unrealised P&L + optional simplified funding estimate.",
     "Maintenance requirement = quantity × stressed price × user-entered maintenance percentage.",
-    "Fees, slippage, realised/unrealised accounting differences, liquidation execution, insurance, backstop and ADL are excluded.",
+    "Maker/taker fees are documented as 0% on current testnet; liquidation fees, gas/stop-order costs, spread/slippage, realised/unrealised accounting differences, liquidation execution, insurance, backstop and ADL are excluded.",
     "Funding rate is quoted per 8-hour window and applied one eighth per hourly settlement, using entry notional and a constant assumed rate; it is not a forecast.",
     "This result is not an official dreamDEX liquidation price or liquidation status.",
     "A live reference price, when present, is a top-of-book bid/ask midpoint, not the protocol mark price."
@@ -108,7 +108,7 @@ function download(){
  try{const s=compute();latest=s;const report={...s,generatedAt:new Date().toISOString(),verification:{onChain:false,liveAccountDataUsed:false,transactionHash:null},disclaimer:"This is a local scenario estimate, not on-chain evidence, financial advice, an official liquidation price, or a prediction of protocol liquidation behavior."};const blob=new Blob([JSON.stringify(report,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="perps-stress-lab-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);setText("export-feedback","Scenario JSON exported. It is labelled as local, non-on-chain evidence.");}catch(e){setText("export-feedback",e instanceof Error?e.message:"Unable to export this scenario.");}
 }
 async function copySummary(){
- try{const s=compute();const summary=["PERPS STRESS LAB — SCENARIO SUMMARY","Network: Somnia Hideki testnet (50383)","Source: "+s.source+"; not on-chain evidence","Market: "+s.market,"Direction: "+s.side.toUpperCase(),"Entry: "+usd(s.entryPrice),"Quantity: "+fmt(s.quantity,8),"Shock: "+pct(s.shockPercent),"Stressed price: "+usd(s.stressedPrice),"Estimated P&L: "+usd(s.pnlUsd),"Estimated equity: "+usd(s.equityUsd),"Maintenance estimate: "+usd(s.maintenanceUsd),"Headroom: "+usd(s.headroomUsd),"Funding estimate: "+usd(s.funding.estimatedUsd),"","This simplified isolated-position estimate excludes fees, other positions, full protocol accounting and liquidation execution."].join("\n");await navigator.clipboard.writeText(summary);setText("export-feedback","Readable scenario summary copied.");}catch{setText("export-feedback","Clipboard access failed. Use Export scenario JSON instead.");}
+ try{const s=compute();const summary=["PERPS STRESS LAB — SCENARIO SUMMARY","Network: Somnia Hideki testnet (50383)","Source: "+s.source+"; not on-chain evidence","Market: "+s.market,"Direction: "+s.side.toUpperCase(),"Entry: "+usd(s.entryPrice),"Quantity: "+fmt(s.quantity,8),"Shock: "+pct(s.shockPercent),"Stressed price: "+usd(s.stressedPrice),"Estimated P&L: "+usd(s.pnlUsd),"Estimated equity: "+usd(s.equityUsd),"Maintenance estimate: "+usd(s.maintenanceUsd),"Headroom: "+usd(s.headroomUsd),"Funding estimate: "+usd(s.funding.estimatedUsd),"","This simplified single-position estimate excludes cross-margin offsets, account-wide collateral, liquidation fees and gas costs, full protocol accounting and liquidation execution."].join("\n");await navigator.clipboard.writeText(summary);setText("export-feedback","Readable scenario summary copied.");}catch{setText("export-feedback","Clipboard access failed. Use Export scenario JSON instead.");}
 }
 async function loadMarketPrice(symbol:string){
  const requestId=++marketPriceRequestId;
