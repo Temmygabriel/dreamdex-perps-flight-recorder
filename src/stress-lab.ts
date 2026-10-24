@@ -14,6 +14,8 @@ let lastRunAt:string | null = null;
 let entryPriceSource: "manual-input" | "live-order-book-midpoint" = "manual-input";
 let entryWasManuallyEdited = false;
 let marketPriceRequestId = 0;
+let marketRiskRequestId = 0;
+let accountRiskRequestId = 0;
 let priceReference: {source:string;timestamp:string|null;bestBid:number|null;bestAsk:number|null} = {source:"manual input",timestamp:null,bestBid:null,bestAsk:null};
 
 function num(id:string):number { return Number($<HTMLInputElement | HTMLSelectElement>(id).value); }
@@ -166,13 +168,164 @@ async function loadMarkets(){
   if([...select.options].some(o=>o.value===previous))select.value=previous;
   status.innerHTML='<span class="status-dot"></span> Market list loaded';
   setText("method-data","Loaded "+markets.length+" live Hideki market definitions. Fetching a read-only order-book midpoint for the selected market; no account margin or liquidation state is queried.");
-  await loadMarketPrice(select.value);
+  void loadMarketPrice(select.value);
+  void loadMarketRisk(select.value);
  }catch(e){
   status.innerHTML='<span class="status-dot muted"></span> Live data unavailable';
   setText("market-hint","Live market metadata unavailable; this remains a manual hypothetical scenario.");
   setText("method-data","Read-only market-data request failed: "+(e instanceof Error?e.message:"unknown error")+". Manual scenarios remain available; no live-data claim is made.");
  }
  update();
+}
+
+
+async function loadMarketRisk(symbol:string){
+ const requestId=++marketRiskRequestId;
+ const card=$<HTMLElement>("live-risk-card");
+ card.dataset.state="loading";
+ setText("market-risk-status","Loading protocol risk parameters…");
+ setText("market-risk-note","Reading static market risk settings and the protocol mark-health snapshot from Hideki.");
+ try{
+  const response=await fetch("/api/market-risk?symbol="+encodeURIComponent(symbol),{headers:{accept:"application/json"},cache:"no-store",signal:AbortSignal.timeout(15000)});
+  const payload=await response.json() as {ok?:boolean;error?:string;symbol?:string;baseSymbol?:string;readAt?:string;riskParameters?:Record<string,unknown>;marketHealth?:Record<string,unknown>};
+  if(requestId!==marketRiskRequestId||val("market")!==symbol)return;
+  if(!response.ok||!payload.ok)throw new Error(payload.error??"Market risk endpoint did not return verified data.");
+  const risk=payload.riskParameters??{};
+  const health=payload.marketHealth??{};
+  const percent=(value:unknown)=>value==null?"Unavailable":fmt(Number(value),2)+"%";
+  setText("market-risk-imf",percent(risk.initialMarginFloorPercent));
+  setText("market-risk-effective-imf",percent(risk.effectiveInitialMarginPercent));
+  setText("market-risk-maintenance",percent(risk.maintenanceMarginPercent));
+  setText("market-risk-closeout",percent(risk.closeOutMarginPercent));
+  setText("market-risk-fees",risk.makerFeePercent==null||risk.takerFeePercent==null?"Unavailable":fmt(Number(risk.makerFeePercent),3)+"% / "+fmt(Number(risk.takerFeePercent),3)+"%");
+  setText("market-risk-max-position",risk.maxPositionSizeBase==null?"Unavailable":fmt(Number(risk.maxPositionSizeBase),8)+" "+String(payload.baseSymbol??""));
+  setText("market-risk-mark",health.priceable===true&&health.markPrice!=null?usd(Number(health.markPrice)):"Unavailable");
+  if(health.priceable===true){
+   card.dataset.state="ready";
+   setText("market-risk-status","Protocol mark available · "+(payload.readAt?new Date(payload.readAt).toLocaleTimeString():"read complete"));
+   setText("market-risk-note","Static risk limits come from the pool configuration. Effective initial margin reflects the current protocol snapshot; the scenario entry still uses a separate editable book midpoint.");
+  }else{
+   card.dataset.state="stale";
+   setText("market-risk-status","Mark stale or unpriceable");
+   setText("market-risk-note","Static risk limits are still available, but Hideki did not mark this market priceable. Do not treat missing price data as zero or infer liquidation safety.");
+  }
+ }catch(error){
+  if(requestId!==marketRiskRequestId||val("market")!==symbol)return;
+  card.dataset.state="error";
+  setText("market-risk-status","Live risk data unavailable");
+  for(const id of ["market-risk-imf","market-risk-effective-imf","market-risk-maintenance","market-risk-closeout","market-risk-fees","market-risk-max-position","market-risk-mark"])setText(id,"—");
+  setText("market-risk-note",error instanceof Error?error.message:"Could not read live risk data. The hypothetical scenario remains separate and does not become an account risk verdict.");
+ }
+}
+
+function accountAmount(value:unknown):string{
+ if(value===null||value===undefined||value==="")return "Unavailable";
+ const n=Number(value);
+ return Number.isFinite(n)?usd(n):"Unavailable";
+}
+function accountQuantity(value:unknown):string{
+ if(value===null||value===undefined||value==="")return "Unavailable";
+ const n=Number(value);
+ return Number.isFinite(n)?fmt(n,8):"Unavailable";
+}
+function accountField(label:string,value:string){
+ const box=document.createElement("div");box.className="position-metric";
+ const name=document.createElement("span");name.textContent=label;
+ const result=document.createElement("strong");result.textContent=value;
+ box.append(name,result);return box;
+}
+function renderAccountPositions(rows:unknown, status:string){
+ const root=$<HTMLElement>("account-position-list");
+ root.replaceChildren();
+ if(!Array.isArray(rows)||rows.length===0){
+  const empty=document.createElement("p");empty.className="account-risk-empty";
+  empty.textContent=status==="unavailable"
+    ?"Position details could not be loaded. Account health was not inferred from missing position data."
+    :"No open positions were returned for this MarginBank snapshot.";
+  root.append(empty);return;
+ }
+ for(const item of rows){
+  const p=item as Record<string,unknown>;
+  const card=document.createElement("article");card.className="account-position-card";
+  const head=document.createElement("div");head.className="account-position-head";
+  const title=document.createElement("div");title.className="account-position-title";
+  const strong=document.createElement("strong");strong.textContent=String(p.symbol??"Unknown market")+" · "+String(p.side??"unknown").toUpperCase();
+  const pool=document.createElement("small");const poolAddress=String(p.poolAddress??"");
+  pool.textContent=poolAddress?poolAddress.slice(0,8)+"…"+poolAddress.slice(-6):"Pool address unavailable";
+  title.append(strong,pool);
+  const chip=document.createElement("span");chip.className="position-health-chip";chip.dataset.state=p.priceable===true?"ready":"stale";
+  chip.textContent=p.priceable===true?"MARK AVAILABLE":"MARK UNAVAILABLE";
+  head.append(title,chip);card.append(head);
+  const metrics=document.createElement("div");metrics.className="position-metrics";
+  metrics.append(
+   accountField("Quantity",accountQuantity(p.quantityBase)),
+   accountField("Entry price",p.entryPrice==null?"Unavailable":accountAmount(p.entryPrice)),
+   accountField("Mark price",p.markPrice==null?"Unavailable":accountAmount(p.markPrice)),
+   accountField("Notional",accountAmount(p.notionalUsdso)),
+   accountField("Unrealised P&L",accountAmount(p.unrealizedPnlUsdso)),
+   accountField("Funding owed",accountAmount(p.accruedFundingOwedUsdso)),
+   accountField("Maintenance share",accountAmount(p.maintenanceMarginRequirementUsdso)),
+   accountField("SDK liquidation estimate",p.estimatedLiquidationPrice==null?"Unavailable":accountAmount(p.estimatedLiquidationPrice))
+  );
+  card.append(metrics);
+  if(p.liquidationPriceStatus!=="sdk-estimate"){
+   const note=document.createElement("p");note.className="account-risk-caveat";
+   note.textContent="Liquidation estimate unavailable: "+String(p.liquidationPriceStatus??"price status unknown")+". No zero-price substitute was used.";
+   card.append(note);
+  }
+  root.append(card);
+ }
+}
+async function runAccountRisk(){
+ const requestId=++accountRiskRequestId;
+ const address=$<HTMLInputElement>("account-risk-address").value.trim();
+ const button=$<HTMLButtonElement>("account-risk-submit");
+ const resultRoot=$<HTMLElement>("account-risk-results");
+ if(!/^0x[0-9a-fA-F]{40}$/.test(address)){
+  setText("account-risk-status","Enter a valid public EVM address (0x followed by 40 hexadecimal characters). Never enter a private key.");
+  $("account-risk-status").dataset.state="warning";resultRoot.hidden=true;return;
+ }
+ button.disabled=true;setText("account-risk-submit","Checking account…");
+ setText("account-risk-status","Reading the MarginBank and active positions from Hideki. No signature or transaction will be requested.");
+ $("account-risk-status").dataset.state="";
+ resultRoot.hidden=true;
+ try{
+  const symbol=val("market");
+  const url="/api/account-risk?address="+encodeURIComponent(address)+"&symbol="+encodeURIComponent(symbol);
+  const response=await fetch(url,{headers:{accept:"application/json"},cache:"no-store",signal:AbortSignal.timeout(25000)});
+  const payload=await response.json() as {ok?:boolean;error?:string;readAt?:string;accountHealthAvailable?:boolean;accountHealthStatus?:string;positionsStatus?:string;positionsSource?:string;summary?:Record<string,unknown>;positions?:unknown;positionCount?:number;network?:{chainId?:number};marketScope?:{symbol?:string}};
+  if(requestId!==accountRiskRequestId)return;
+  if(!response.ok||!payload.ok)throw new Error(payload.error??"The account-risk endpoint did not return a usable snapshot.");
+  const summary=payload.summary??{};
+  const available=payload.accountHealthAvailable===true;
+  const amount=(key:string)=>accountAmount(summary[key]);
+  setText("account-risk-equity",amount("equityUsdso"));
+  setText("account-risk-unlocked",amount("unlockedCollateralUsdso"));
+  setText("account-risk-locked",amount("lockedCollateralUsdso"));
+  setText("account-risk-withdrawable",amount("withdrawableUsdso"));
+  setText("account-risk-im",amount("initialMarginRequirementUsdso"));
+  setText("account-risk-mm",amount("maintenanceMarginRequirementUsdso"));
+  setText("account-risk-cm",amount("closeOutMarginRequirementUsdso"));
+  setText("account-risk-position-count",String(payload.positionCount??0));
+  setText("account-risk-health-badge",String(summary.marginStatus??payload.accountHealthStatus??"unknown"));
+  setText("account-risk-position-source",payload.positionsSource?.toLowerCase().includes("indexer")?"INDEXER FALLBACK":"ON-CHAIN");
+  renderAccountPositions(payload.positions,payload.positionsStatus??"available");
+  resultRoot.hidden=false;
+  if(available){
+   $("account-risk-status").dataset.state="ready";
+   setText("account-risk-status","Account snapshot loaded for "+address.slice(0,8)+"…"+address.slice(-6)+" · "+String(payload.marketScope?.symbol??symbol)+" · read-only · "+(payload.readAt?new Date(payload.readAt).toLocaleTimeString():"time unavailable")+". This is a protocol snapshot, not a liquidation execution guarantee.");
+  }else{
+   $("account-risk-status").dataset.state="warning";
+   setText("account-risk-status","Account health is unavailable because a mark or RPC read may be stale. "+(summary.collateralBasisUsdso!=null?"Collateral basis (not equity): "+accountAmount(summary.collateralBasisUsdso)+". ":"")+"No healthy/unhealthy verdict or liquidation price was inferred; position rows may use an explicitly labelled indexer fallback.");
+  }
+ }catch(error){
+  if(requestId!==accountRiskRequestId)return;
+  resultRoot.hidden=true;
+  $("account-risk-status").dataset.state="error";
+  setText("account-risk-status",error instanceof Error?error.message:"Account-risk read failed. No verdict was produced.");
+ }finally{
+  if(requestId===accountRiskRequestId){button.disabled=false;setText("account-risk-submit","Check account risk ↗");}
+ }
 }
 
 type ThemeMode = "light" | "dim";
@@ -229,7 +382,7 @@ document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.addEve
   priceReference={source:"waiting for selected market quote",timestamp:null,bestBid:null,bestAsk:null};
  }
  update();
- if(id==="market")void loadMarketPrice(val("market"));
+ if(id==="market"){void loadMarketPrice(val("market"));void loadMarketRisk(val("market"));}
 }));
 $("funding-toggle").addEventListener("change",()=>{lastRunAt=null;const enabled=$<HTMLInputElement>("funding-toggle").checked; $("funding-fields").setAttribute("aria-disabled",String(!enabled));$<HTMLInputElement>("funding-rate").disabled=!enabled;$<HTMLSelectElement>("funding-periods").disabled=!enabled;update();});
 $<HTMLSelectElement>("leverage").addEventListener("change",()=>{if(val("leverage")==="custom")return;lastRunAt=null;$<HTMLInputElement>("starting-margin").value=String(100/num("leverage"));update();});
@@ -237,5 +390,6 @@ $("run-scenario").addEventListener("click",markRun);
 $("export-json").addEventListener("click",download);
 $("copy-summary").addEventListener("click",()=>void copySummary());
 $("refresh-data").addEventListener("click",()=>void loadMarkets());
+$("account-risk-form").addEventListener("submit",(event)=>{event.preventDefault();void runAccountRisk();});
 loadMarkets();
 update();
