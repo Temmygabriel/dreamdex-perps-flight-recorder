@@ -131,7 +131,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       const market = markets.find((row) => String(row.poolAddress ?? "").toLowerCase() === poolAddress.toLowerCase());
       const baseDecimals = Number(market?.baseDecimals ?? 18);
       const symbol = market ? marketSymbol(market) : "Unknown market";
-      const ref = { marginBank: marginBank as \`0x\${string}\`, account: account as \`0x\${string}\`, pool: poolAddress as \`0x\${string}\` };
+      const ref = { marginBank, account, pool: poolAddress };
       let position: AnyRow | null = null;
       let analytics: AnyRow | null = null;
       let positionReadStatus = "available";
@@ -223,7 +223,6 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       accountHealthStatus,
       positionsSource,
       positionsStatus: positionsFallbackUnavailable ? "unavailable" : "available",
-      account: account,
       summary: accountSummary,
       positionCount: positions.length,
       positions,
