@@ -97,12 +97,28 @@ async function main(): Promise<void> {
         ...(actual.liquidationEngine !== EXPECTED.liquidationEngine ? ["liquidationEngine"] : []),
         ...(actual.insuranceFund !== EXPECTED.insuranceFund ? ["insuranceFund"] : []),
       ];
+      const operationalConfig: Record<string, unknown> = {};
+      try {
+        operationalConfig.liquidationEngine = clean(
+          await exchange.client.getLiquidationEngineConfig(actual.liquidationEngine as `0x${string}`),
+        );
+      } catch (error) {
+        operationalConfig.liquidationEngineReadError = error instanceof Error ? error.message : "unknown read failure";
+      }
+      try {
+        operationalConfig.insuranceFund = clean(
+          await exchange.client.getInsuranceFundState(actual.insuranceFund as `0x${string}`),
+        );
+      } catch (error) {
+        operationalConfig.insuranceFundReadError = error instanceof Error ? error.message : "unknown read failure";
+      }
       systemConfigs.push({
         marginBank: bank,
         fullyWired: config.fullyWired ?? null,
         actual,
         addressMismatches,
         publishedAddressesMatch: addressMismatches.length === 0,
+        operationalConfig,
       });
     }
     const openOrders: Record<string, unknown>[] = [];
@@ -170,7 +186,23 @@ async function main(): Promise<void> {
       allMarketOrderReadsSucceeded: orderReadErrors.length === 0,
       safeForLiveLiquidationTest: positions.length === 0 && openOrders.length === 0 && orderReadErrors.length === 0,
     };
-    report.deployment = { observedBlockNumber: observedBlockNumber.toString(), systemConfigs, bytecode };
+    const hashGroups = new Map<string, string[]>();
+    for (const item of bytecode as Array<Record<string, any>>) {
+      if (typeof item.runtimeBytecodeKeccak256 !== "string") continue;
+      const group = hashGroups.get(item.runtimeBytecodeKeccak256) ?? [];
+      group.push(String(item.address));
+      hashGroups.set(item.runtimeBytecodeKeccak256, group);
+    }
+    const duplicateRuntimeBytecodeHashes = [...hashGroups.entries()]
+      .filter(([, addresses]) => addresses.length > 1)
+      .map(([runtimeBytecodeKeccak256, addresses]) => ({ runtimeBytecodeKeccak256, addresses }));
+    report.deployment = {
+      observedBlockNumber: observedBlockNumber.toString(),
+      systemConfigs,
+      bytecode,
+      duplicateRuntimeBytecodeHashes,
+      bytecodeNote: "Identical runtime hashes may be intentional shared proxy code; they are a review signal, not proof of identical implementation.",
+    };
     report.verdict = {
       accountStateClean: positions.length === 0 && openOrders.length === 0 && orderReadErrors.length === 0,
       allExpectedContractsHaveBytecode: bytecode.every((x: any) => x.deployed === true),
