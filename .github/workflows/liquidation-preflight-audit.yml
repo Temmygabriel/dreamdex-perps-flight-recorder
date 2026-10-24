@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/liquidation-preflight-audit.yml"
       - "scripts/audit-liquidation-preflight.ts"
+      - ".github/POST_POSITION_ROUNDTRIP_AUDIT.txt"
   workflow_dispatch:
     inputs:
       confirm_read_only_audit:
