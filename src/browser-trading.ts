@@ -30,14 +30,13 @@ function status(message: string, error = false) {
   const el = $("wallet-trade-status");
   el.dataset.state = error ? "error" : "info";
 }
-function txLink(hash: string) {
+function txLink(hash: string, label: string) {
   const root = $("wallet-trade-evidence");
-  root.replaceChildren();
   const link = document.createElement("a");
   link.href = "https://shannon-explorer.somnia.network/tx/" + hash;
   link.target = "_blank";
   link.rel = "noreferrer";
-  link.textContent = "View transaction " + short(hash);
+  link.textContent = label + " transaction · " + short(hash) + " ↗";
   root.append(link);
 }
 function injected() {
@@ -139,7 +138,7 @@ async function openPosition() {
     const hash = (result as any)?.hash ?? (result as any)?.transactionHash;
     if (typeof hash !== "string" || !/^0x[a-fA-F0-9]{64}$/.test(hash)) throw new Error("SDK returned without a recognizable transaction hash. Reconcile the account before retrying.");
     lastEntryHash = hash as Hex;
-    txLink(hash);
+    txLink(hash, "Entry");
     status("Entry transaction confirmed by the SDK. Verifying BTC position read-back…");
     await waitForPosition(true);
     status("BTC position verified on Hideki. Transaction hash captured; you can now close the position.");
@@ -172,7 +171,7 @@ async function closePosition() {
     const result = await exchange.trader.placePerpOrder({ pool: market.poolAddress, isBid: side === "short", price, quantity, orderType: ORDER_TYPE.MARKET, gas: 10000000n });
     const hash = (result as any)?.hash ?? (result as any)?.transactionHash;
     if (typeof hash !== "string" || !/^0x[a-fA-F0-9]{64}$/.test(hash)) throw new Error("SDK returned without a recognizable close transaction hash. Reconcile the account.");
-    txLink(hash);
+    txLink(hash, "Close");
     status("Close transaction confirmed by the SDK. Verifying flat state…");
     await waitForPosition(false);
     const ordersAfter = await exchange.fetchOpenOrders(marketSymbol);
