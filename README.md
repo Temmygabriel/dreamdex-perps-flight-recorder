@@ -41,7 +41,7 @@ Optional funding uses the documented sign and settlement cadence: the rate is qu
 - Chain ID: `50383`
 - RPC: `https://api.hideki2.infra.testnet.somnia.network`
 - Perps SDK pinned in `package.json`: `@somnia-chain/markets-sdk@0.32.1`
-- The browser app does not need a private key or mainnet funds. Optional CI readiness checks use the GitHub Actions `wallet_key` secret only for read-only steps.
+- The browser app never needs a private key; live orders are signed by the connected wallet. The separate GitHub Actions funded round-trip uses the `wallet_key` secret for capped testnet transactions, while read-only CI checks do not sign.
 
 ## Live browser-wallet testnet trading
 
