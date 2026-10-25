@@ -2,7 +2,7 @@
 
 **Stress-test your position before you trade.**
 
-Perps Stress Lab is a read-only risk explorer for dreamDEX Perps on Somnia Hideki/Tokyo testnet. It combines two separate tools: (1) a hypothetical position stress lab that lets users apply market shocks and inspect the maths, and (2) a public-address Account Risk Check that reads live cross-margin collateral, margin requirements, open positions, and SDK liquidation-price estimates. The app never asks for a private key or signs a transaction.
+Perps Stress Lab combines a hypothetical position stress explorer, a read-only public-address Account Risk Check, and an opt-in browser-wallet trading panel for capped Hideki testnet BTC position lifecycle testing. The web app never asks for a private key or seed phrase. Only the connected wallet can approve live testnet transactions, and the scenario calculator never submits orders.
 
 > **Important:** The stress slider is a hypothetical single-position model; it is not a liquidation calculator and its maintenance percentage remains an explicit scenario assumption. Separately, the Account Risk Check reads actual account-level cross-margin information from the SDK when available. That account view can show current equity and account-wide requirements, and estimate a liquidation price for each active market. An SDK liquidation-price estimate holds the other markets' contributions constant and is not a guarantee of liquidation execution. Missing/stale marks or RPC/indexer errors are shown as unavailable, never as zero or as a healthy status. The entry price in the hypothetical lab may be prefilled from a live top-of-book midpoint; that midpoint is not the protocol mark price.
 
@@ -41,7 +41,21 @@ Optional funding uses the documented sign and settlement cadence: the rate is qu
 - Chain ID: `50383`
 - RPC: `https://api.hideki2.infra.testnet.somnia.network`
 - Perps SDK pinned in `package.json`: `@somnia-chain/markets-sdk@0.32.1`
-- The browser app does not need a private key or mainnet funds. Optional CI readiness checks use the GitHub Actions `wallet_key` secret only for read-only steps.
+- The browser app never needs a private key; live orders are signed by the connected wallet. The separate GitHub Actions funded round-trip uses the `wallet_key` secret for capped testnet transactions, while read-only CI checks do not sign.
+
+## Live browser-wallet testnet trading
+
+The **Live testnet trading** panel uses the Somnia Markets SDK's injected-wallet signer path. It is separate from the hypothetical stress model and the read-only Account Risk Check.
+
+- Connects through an injected EVM wallet (for example MetaMask) and requires Somnia Hideki testnet, chain ID `50383`.
+- Reads live BTC Perps market configuration and order book; stops if the account already has a BTC position/open order, the market is unpriceable, or protocol preflight rejects the order.
+- Offers one capped BTC long MARKET entry with a target of 10 USDso and a hard estimated notional band of 5–15 USDso. The SDK's live lot size, minimum quantity and tick size are used.
+- Requires explicit confirmation in the page and a separate wallet approval for entry and close. Closing is a separate opposing MARKET order and also requires wallet approval.
+- Shows a transaction hash link and waits for SDK receipt handling plus position-state read-back. The close path additionally checks that no BTC open orders remain.
+- On wallet rejection, ambiguous submission, changed account/network, or failed read-back, it does not blindly rebroadcast. The user must reconcile wallet activity and current account state before retrying.
+- The panel does not automatically deposit collateral or claim vouchers. If available Perps margin is insufficient, protocol preflight blocks the order. A close failure may leave a position open; the UI must be treated as testnet tooling, not an unattended recovery service.
+
+The automated GitHub Actions round-trip is a separate validation path using the repository secret `wallet_key`; the secret is never included in browser code, logs, or evidence artifacts. A successful Actions run proves the script's signed testnet path, not that an individual browser wallet has connected successfully. Browser wallet connection and transaction approval still require a user to complete the flow in a compatible wallet.
 
 ## Read-only Account Risk Check
 

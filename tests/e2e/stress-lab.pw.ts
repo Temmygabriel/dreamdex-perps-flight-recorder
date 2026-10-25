@@ -80,11 +80,11 @@ test.beforeEach(async ({ page }) => {
 
 test("starts with internally consistent default calculations and live-preview wording", async ({ page }) => {
   await expect(page.locator("#scenario-status")).toHaveText("LIVE PREVIEW");
-  await expect(page.locator("#result-price")).toHaveText("$90,000.00");
-  await expect(page.locator("#result-pnl")).toHaveText("−$100.00");
-  await expect(page.locator("#result-equity")).toHaveText("$0.00");
-  await expect(page.locator("#result-headroom")).toHaveText("−$22.50");
-  await expect(page.locator("#trace-equity-value")).toHaveText("$0.00");
+  await expect(page.locator("#result-price")).toHaveText("90,000.00");
+  await expect(page.locator("#result-pnl")).toHaveText("−100.00");
+  await expect(page.locator("#result-equity")).toHaveText("0.00");
+  await expect(page.locator("#result-headroom")).toHaveText("−22.50");
+  await expect(page.locator("#trace-equity-value")).toHaveText("0.00");
 });
 
 test("prefills the selected market from a labelled read-only book midpoint", async ({ page }) => {
@@ -199,7 +199,7 @@ test("invalid input clears stale results and cannot be marked reviewed or export
   await expect(page.locator("#scenario-status")).toHaveText("CHECK INPUTS");
   await expect(page.locator("#result-pnl")).toHaveText("—");
   await page.locator("#entry").fill("100000");
-  await expect(page.locator("#result-pnl")).toHaveText("−$100.00");
+  await expect(page.locator("#result-pnl")).toHaveText("−100.00");
   await expect(page.locator("#export-json")).toBeEnabled();
   await page.locator("#run-scenario").click();
   await expect(page.locator("#scenario-status")).toHaveText("SCENARIO REVIEWED");
@@ -225,7 +225,7 @@ test("preserves a manually entered price when a delayed refreshed quote arrives"
   releaseQuote();
   await expect(page.locator("#entry")).toHaveValue("123456.78");
   await expect(page.locator("#market-hint")).toContainText("Manual entry retained");
-  await expect(page.locator("#result-price")).toHaveText("$111,111.10");
+  await expect(page.locator("#result-price")).toHaveText("111,111.10");
 });
 
 
@@ -264,7 +264,7 @@ test("shows live protocol risk settings separately from the editable scenario pr
   await expect(page.locator("#market-risk-status")).toContainText("Protocol mark available");
   await expect(page.locator("#market-risk-imf")).toHaveText("5.00%");
   await expect(page.locator("#market-risk-maintenance")).toHaveText("2.50%");
-  await expect(page.locator("#market-risk-mark")).toHaveText("$100,000.00");
+  await expect(page.locator("#market-risk-mark")).toHaveText("100,000.00");
   await expect(page.locator("#market-risk-note")).toContainText("Static risk limits");
 });
 
@@ -272,7 +272,7 @@ test("read-only Account Risk Check displays cross-margin summary and multiple po
   await page.locator("#account-risk-address").fill("0x19393aEd711c5C17C8B62C4cB6Cc2c32A31B5f7A");
   await page.locator("#account-risk-submit").click();
   await expect(page.locator("#account-risk-status")).toContainText("Account snapshot loaded");
-  await expect(page.locator("#account-risk-equity")).toHaveText("$100.00");
+  await expect(page.locator("#account-risk-equity")).toHaveText("100.00");
   await expect(page.locator("#account-risk-position-count")).toHaveText("2");
   await expect(page.locator(".account-position-card")).toHaveCount(2);
   await expect(page.locator(".account-position-card").first()).toContainText("SDK liquidation estimate");

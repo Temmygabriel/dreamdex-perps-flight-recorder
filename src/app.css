@@ -522,3 +522,131 @@ html[data-theme="dim"] select:disabled{color:#82909e}
  html[data-theme="dim"] .nav-item{background:#202832;border-color:#35414e}
  html[data-theme="dim"] .nav-item.active{background:#2b3923;border-color:#4b6236}
 }
+
+
+/* Targeted clarity pass: communicate provenance and unavailable states without changing the vetted layout. */
+.assumption-help{
+ display:block;
+ margin-top:7px;
+ padding:8px 10px;
+ border-left:3px solid #a8cf4b;
+ border-radius:0 6px 6px 0;
+ background:#f5f9eb;
+ color:#586981;
+ font-size:10px;
+ line-height:1.65;
+}
+#live-risk-card[data-state="loading"]{border-style:dashed}
+#live-risk-card[data-state="ready"]{border-color:#cfe1a6}
+#live-risk-card[data-state="stale"]{border-color:#e6d2a7;background:#fffaf0}
+#live-risk-card[data-state="error"]{border-color:#e6c2c5;background:#fff7f7}
+#live-risk-card[data-freshness="aging"] .live-risk-head small{color:#986a19}
+#live-risk-card[data-state="stale"] .live-risk-head small,
+#live-risk-card[data-state="error"] .live-risk-head small{font-weight:700}
+#account-risk-status[data-state="ready"]{border-left-color:#78ad42}
+#account-risk-status[data-state="warning"]{border-left-color:#d3a23a;background:#fff9ec}
+#account-risk-status[data-state="error"]{border-left-color:#c85c64;background:#fff6f6}
+html[data-theme="dim"] .assumption-help{background:#273124;border-left-color:#b8dc69;color:#c3cdbb}
+html[data-theme="dim"] #live-risk-card[data-state="ready"]{border-color:#506642}
+html[data-theme="dim"] #live-risk-card[data-state="stale"]{border-color:#6c5735;background:#29271f}
+html[data-theme="dim"] #live-risk-card[data-state="error"]{border-color:#6c3f45;background:#2a2225}
+html[data-theme="dim"] #account-risk-status[data-state="warning"]{background:#302b20}
+html[data-theme="dim"] #account-risk-status[data-state="error"]{background:#302326}
+@media(max-width:760px){
+ .assumption-help{font-size:10px}
+ #live-risk-card .live-risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* UI review round 2: mobile clarity, existing navy/lime visual system retained */
+.field-group select{appearance:none;-webkit-appearance:none;background-repeat:no-repeat;background-position:right 14px center;background-size:16px;padding-right:38px}
+html[data-theme="dim"] .field-group select{background-repeat:no-repeat;background-position:right 14px center;background-size:16px;padding-right:38px}
+.live-risk-card{padding:16px;border-radius:10px;margin-top:12px}
+.live-risk-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.live-risk-head>strong{font-size:14px;line-height:1.4}
+.live-risk-status{display:block;color:#7a8799;font-size:11px;line-height:1.5;margin:0 0 12px}
+.risk-live-chip{flex-shrink:0;border:1px solid #d5e2b8;border-radius:999px;padding:4px 8px;font:9px var(--mono);color:#5c761e;background:#f4f8e9}
+.live-risk-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:16px}
+.live-risk-grid>div:not(.risk-group-label){display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:12px 0;border-bottom:1px solid #e3e8ef;min-width:0}
+.live-risk-grid>div>span{font-size:12px;line-height:1.45;color:#778397;min-width:0}
+.live-risk-grid>div>strong{font:600 13px/1.45 var(--mono);text-align:right;overflow-wrap:anywhere;color:#26364a;min-width:0}
+.risk-group-label{grid-column:1/-1;padding-top:13px;font:9px var(--mono);letter-spacing:1px;color:#7d8b9d}
+#market-risk-note,.assumption-help,.account-risk-intro,.account-risk-safety-note,.account-risk-status,.price-difference-note{font-size:12px;line-height:1.65;color:#738196}
+.price-difference-note{margin:9px 0 0;padding:10px 11px;border-left:3px solid #a8cf4b;background:#f5f9eb;border-radius:0 7px 7px 0}
+.scope-lens{display:block;padding:0;overflow:hidden;margin:14px 0 20px;border-color:#3b4a30;background:#20291e}
+.scope-toggle{display:flex;width:100%;min-height:44px;align-items:center;gap:10px;padding:14px 16px;text-align:left;background:transparent;border:0;color:inherit;cursor:pointer}
+.scope-mark{font-size:20px;color:#c6e58a;flex:none}
+.scope-summary{display:grid;gap:5px;min-width:0;flex:1}
+.scope-summary>strong{font:9px var(--mono);letter-spacing:.7px;color:#d7e9b4}
+.scope-summary>span{font-size:13px;line-height:1.45;color:#edf2e4}
+.scope-summary>small{font-size:11px;color:#b6c3a8;line-height:1.5}
+.scope-toggle-label{font-size:11px;color:#c6e58a;white-space:nowrap;flex:none}
+.scope-details{padding:0 16px 16px;border-top:1px solid #3c4b34}
+.scope-details[hidden],.scope-modal-backdrop[hidden]{display:none!important}
+.scope-collateral{font:9px var(--mono);letter-spacing:.6px;color:#c2d4ad;text-align:center;margin:14px 0 8px}
+.scope-collateral-bar{height:8px;border-radius:5px;background:repeating-linear-gradient(90deg,#8cac51 0 7px,#a9cb66 7px 10px);margin:0 4px 14px}
+.scope-positions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.scope-position{display:grid;gap:5px;text-align:center;padding:12px 4px;border:1px dashed #59624e;border-radius:8px;color:#8f9a85;min-width:0}
+.scope-position b{font-size:10px;overflow-wrap:anywhere}.scope-position small{font-size:9px;color:#929d88}
+.scope-position.included{border:1px solid #b8e34a;color:#e0f1bb;background:#2b3923}.scope-position.included small{color:#c5df91}
+.scope-caption,.scope-units{font-size:12px;line-height:1.65;color:#c0cbb5;margin:10px 0 15px}
+.scope-group{margin-top:14px}.scope-group h4{font:10px var(--mono);color:#dce8ce;margin:0 0 8px}
+.scope-chips{display:flex;flex-wrap:wrap;gap:7px}
+.scope-chip{min-height:36px;padding:8px 10px;border:1px solid #4b5942;border-radius:999px;background:#293324;color:#d5dfc8;font-size:11px;line-height:1.3;text-align:left}
+.scope-group:first-of-type .scope-chip{border-color:#5b743b;color:#d9efb1}.scope-group:nth-of-type(2) .scope-chip{border-color:#53604a}.scope-group:nth-of-type(3) .scope-chip{border-color:#755d36;color:#f0ce8b;background:#30291f}
+.scope-detail-box{padding:10px 12px;border:1px solid #3d4a35;border-radius:8px;background:#1a2118;color:#c0cbb5;font-size:12px;line-height:1.6;margin-top:12px}
+.scope-bridge{width:100%;white-space:normal;line-height:1.5}
+.scope-modal-backdrop{position:fixed;inset:0;z-index:99;display:grid;place-items:end center;padding:16px;background:#05080dcc}
+.scope-modal{position:relative;width:min(100%,460px);padding:24px;border:1px solid #45543b;border-radius:16px;background:#20291e;color:#e9f0e0;box-shadow:0 20px 70px #0008}
+.scope-modal h3{font:500 23px/1.25 Georgia,serif;margin:10px 0}.scope-modal p{font-size:14px;line-height:1.7;color:#c2cdb8;margin:0}
+.scope-modal-close{position:absolute;right:12px;top:10px;width:40px;height:40px;border:1px solid #45543b;border-radius:50%;background:#293324;color:#e9f0e0;font-size:24px}
+.account-risk-panel{padding:20px;margin-top:24px}.account-risk-panel .panel-head{display:flex;flex-wrap:wrap;gap:8px;padding:0;margin-bottom:16px}.account-risk-panel .panel-title{min-width:0;flex:1 1 220px}.account-risk-panel .panel-head>.tiny-chip{flex-shrink:0}
+.account-risk-intro,.account-risk-safety-note,.account-risk-status{margin:0 0 12px;padding:0;color:#738196;overflow-wrap:anywhere}
+.account-risk-form{display:grid;gap:12px}.wallet-address-group{margin-top:16px}
+.wallet-input-wrap{display:flex;align-items:center;gap:6px;border:1px solid #d3dce7;border-radius:8px;background:#fbfcfe;padding:4px;min-width:0}
+.wallet-input-wrap input{flex:1;min-width:0;width:100%;height:38px!important;border:0!important;background:transparent!important;padding:8px!important}
+.paste-button{flex:none;min-height:36px;padding:0 11px;border:1px solid #d3dce7;border-radius:6px;background:#edf2f7;color:#34465e;font-size:11px}
+.wallet-validity{flex:none;width:18px;font-weight:800;text-align:center}.wallet-validity.valid{color:#4f9b46}.wallet-validity.invalid{color:#c74b56}
+.wallet-address-group small{font-size:11px;line-height:1.5}.account-risk-form>.button{width:100%;justify-content:center}.account-risk-form .button:disabled{opacity:.45}
+.account-risk-status{display:flex;gap:9px;align-items:flex-start;padding:12px;border:1px solid #e0e6ee;border-left:3px solid #aab5c2;border-radius:8px;background:#f7f9fb;margin-top:12px}
+.bonus-number{background:#f2f6e9;color:#62821d;border-color:#d7e5bd}
+@media(max-width:760px){.account-risk-panel{padding:20px;margin-top:24px}.account-risk-panel .panel-head .panel-title{flex:1 1 200px}.account-risk-form>.button,.evidence-actions>.button{width:100%}.scope-toggle{padding:13px 12px}.scope-summary>span{font-size:12px}.live-risk-grid{grid-template-columns:minmax(0,1fr)}.live-risk-grid>div:not(.risk-group-label){padding:12px 0}.live-risk-grid>div>span{font-size:14px}.live-risk-grid>div>strong{font-size:15px}.risk-group-label{padding-top:12px}.scope-modal-backdrop{padding:12px}.scope-modal{padding:22px 18px}}
+@media(max-width:390px){.position-panel,.stress-panel{padding:13px}.live-risk-card{padding:13px}.live-risk-grid{grid-template-columns:minmax(0,1fr)}.scope-positions{gap:5px}.scope-position{padding:10px 2px}.scope-position b{font-size:9px}.scope-position small{font-size:8px}.account-risk-panel{padding:20px}.account-risk-panel .panel-head .panel-title{flex:1 1 180px}.scope-chip{font-size:10px;padding:8px 9px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+html[data-theme="dim"] .live-risk-status,html[data-theme="dim"] #market-risk-note,html[data-theme="dim"] .account-risk-intro,html[data-theme="dim"] .account-risk-safety-note,html[data-theme="dim"] .account-risk-status,html[data-theme="dim"] .price-difference-note{color:#a5b0bc}
+html[data-theme="dim"] .live-risk-grid>div:not(.risk-group-label){border-bottom-color:#303b47}
+html[data-theme="dim"] .live-risk-grid>div>span{color:#a5b0bc}
+html[data-theme="dim"] .live-risk-grid>div>strong{color:#e8edf2}
+html[data-theme="dim"] .risk-group-label{color:#9ba8b6}
+html[data-theme="dim"] .risk-live-chip{background:#2b3923;border-color:#4b6236;color:#d9efb1}
+html[data-theme="dim"] .price-difference-note{background:#273124;border-left-color:#b8dc69;color:#c3cdbb}
+html[data-theme="dim"] .wallet-input-wrap{background:#151b22;border-color:#394653}
+html[data-theme="dim"] .wallet-input-wrap input{color:#e8edf2}
+html[data-theme="dim"] .paste-button{background:#222b35;border-color:#3c4855;color:#d4dce4}
+html[data-theme="dim"] .account-risk-status{background:#202832;border-color:#34404d;border-left-color:#82909e}
+html[data-theme="dim"] .bonus-number{background:#2b3923;color:#d9efb1;border-color:#4b6236}
+html[data-theme="dim"] .estimate-tag{background:#2b3923;border-color:#4b6236;color:#d9efb1}
+
+
+/* Browser wallet trading: deliberately separated from the read-only scenario model. */
+.wallet-trading-panel{margin-top:18px;padding:22px;scroll-margin-top:20px}
+.wallet-trading-warning{display:grid;gap:4px;padding:12px 14px;border:1px solid #8b6a3a66;background:#8b6a3a12;border-radius:9px;margin-bottom:17px}
+.wallet-trading-warning strong{color:#f0c783;font-size:12px}
+.wallet-trading-warning span,.wallet-trading-footnote{font-size:11px;color:var(--muted);line-height:1.7}
+.wallet-connect-row,.wallet-trading-state{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid var(--border-soft)}
+.wallet-connect-row>div{display:grid;gap:5px;min-width:0}
+.wallet-connect-row small{font:9px var(--mono);letter-spacing:1px;color:var(--muted)}
+.wallet-connect-row strong{font:12px var(--mono);overflow-wrap:anywhere}
+.wallet-trading-state span{font-size:11px;color:var(--muted)}
+.wallet-trading-state strong{font-size:12px;text-align:right}
+.wallet-order-preview{padding:12px 13px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;margin:16px 0;font:11px var(--mono);line-height:1.8;color:var(--text)}
+.wallet-trading-actions{display:flex;gap:10px;flex-wrap:wrap}
+.wallet-trading-actions .button{min-height:44px}
+.wallet-trading-actions button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.wallet-trade-status{font-size:12px;line-height:1.7;color:var(--muted);padding:11px 13px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border);overflow-wrap:anywhere}
+.wallet-trade-status[data-state="error"]{color:var(--red);border-color:#ff728a66}
+.wallet-trade-evidence a{display:inline-flex;align-items:center;min-height:44px;color:var(--purple-2);font-size:12px;text-decoration:underline}
+.wallet-trading-footnote{margin:13px 0 0}
+@media(max-width:600px){.wallet-trading-panel{padding:15px}.wallet-connect-row{align-items:flex-start;flex-direction:column}.wallet-connect-row .button{width:100%;min-height:44px}.wallet-trading-actions{display:grid;grid-template-columns:1fr}.wallet-trading-actions .button{width:100%}.wallet-trading-state{align-items:flex-start;flex-direction:column}.wallet-trading-state strong{text-align:left}}
+
+.price-difference-note{margin:8px 0 0;padding:9px 10px;border-left:2px solid var(--purple);background:var(--surface-2);color:var(--muted);font-size:11px;line-height:1.6;border-radius:0 6px 6px 0}
