@@ -202,19 +202,26 @@ async function loadMarketRisk(symbol:string){
   setText("market-risk-mark",health.priceable===true&&health.markPrice!=null?usd(Number(health.markPrice)):"Unavailable");
   if(health.priceable===true){
    card.dataset.state="ready";
-   setText("market-risk-status","Protocol mark available · "+(payload.readAt?new Date(payload.readAt).toLocaleTimeString():"read complete"));
-   setText("market-risk-note","Static risk limits come from the pool configuration. Effective initial margin reflects the current protocol snapshot; the scenario entry still uses a separate editable book midpoint.");
+   const readAt=payload.readAt?new Date(payload.readAt):null;
+   const validReadAt=readAt!==null&&Number.isFinite(readAt.getTime());
+   const ageMinutes=validReadAt?Math.max(0,Math.floor((Date.now()-readAt!.getTime())/60000)):null;
+   const freshness=ageMinutes===null?"read time unavailable":ageMinutes===0?"read just now":ageMinutes===1?"read 1 min ago":"read "+ageMinutes+" min ago";
+   setText("market-risk-status","Protocol mark available · "+freshness+(validReadAt?" · "+readAt!.toLocaleTimeString():""));
+   card.dataset.freshness=ageMinutes!==null&&ageMinutes>5?"aging":"fresh";
+   setText("market-risk-note","Read-only pool configuration and protocol mark-health snapshot. This data does not replace the manual maintenance assumption below or the editable order-book midpoint used as scenario entry.");
   }else{
    card.dataset.state="stale";
-   setText("market-risk-status","Mark stale or unpriceable");
+   card.dataset.freshness="unknown";
+   setText("market-risk-status","Mark stale or unpriceable · risk limits only");
    setText("market-risk-note","Static risk limits are still available, but Hideki did not mark this market priceable. Do not treat missing price data as zero or infer liquidation safety.");
   }
  }catch(error){
   if(requestId!==marketRiskRequestId||val("market")!==symbol)return;
   card.dataset.state="error";
+  card.dataset.freshness="unknown";
   setText("market-risk-status","Live risk data unavailable");
   for(const id of ["market-risk-imf","market-risk-effective-imf","market-risk-maintenance","market-risk-closeout","market-risk-fees","market-risk-max-position","market-risk-mark"])setText(id,"—");
-  setText("market-risk-note",error instanceof Error?error.message:"Could not read live risk data. The hypothetical scenario remains separate and does not become an account risk verdict.");
+  setText("market-risk-note","Could not verify the live protocol risk snapshot. Check the connection and retry; no missing values are treated as zero, and the hypothetical scenario remains separate.");
  }
 }
 
