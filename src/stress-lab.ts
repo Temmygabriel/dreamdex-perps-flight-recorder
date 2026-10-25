@@ -208,11 +208,11 @@ async function loadMarketRisk(symbol:string){
    const freshness=ageMinutes===null?"read time unavailable":ageMinutes===0?"read just now":ageMinutes===1?"read 1 min ago":"read "+ageMinutes+" min ago";
    setText("market-risk-status","Protocol mark available · "+freshness+(validReadAt?" · "+readAt!.toLocaleTimeString():""));
    card.dataset.freshness=ageMinutes!==null&&ageMinutes>5?"aging":"fresh";
-   setText("market-risk-note","Read-only pool configuration and protocol mark-health snapshot. This data does not replace the manual maintenance assumption below or the editable order-book midpoint used as scenario entry.");
+   setText("market-risk-note","Static risk limits come from the pool configuration. Effective initial margin reflects the current protocol snapshot; this does not replace the manual maintenance assumption below or the editable order-book midpoint used as scenario entry.");
   }else{
    card.dataset.state="stale";
    card.dataset.freshness="unknown";
-   setText("market-risk-status","Mark stale or unpriceable · risk limits only");
+   setText("market-risk-status","Mark stale or unpriceable");
    setText("market-risk-note","Static risk limits are still available, but Hideki did not mark this market priceable. Do not treat missing price data as zero or infer liquidation safety.");
   }
  }catch(error){
