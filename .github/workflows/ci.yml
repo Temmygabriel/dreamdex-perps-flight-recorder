@@ -200,7 +200,7 @@ jobs:
     permissions:
       contents: read
     env:
-      STRESS_LAB_DEPLOYMENT_URL: https://orderproof-perp.vercel.app
+      STRESS_LAB_DEPLOYMENT_URL: https://perp-stress-lab.vercel.app
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

@@ -24,11 +24,51 @@ const pricePayload = {
   readonly: true,
 };
 
+
+const marketRiskPayload = {
+  ok: true, symbol: "BTC-USDso", baseSymbol: "BTC", quoteSymbol: "USDso",
+  readAt: new Date().toISOString(), readonly: true,
+  riskParameters: {
+    initialMarginFloorPercent: 5, effectiveInitialMarginPercent: 5,
+    maintenanceMarginPercent: 2.5, closeOutMarginPercent: 1.25,
+    makerFeePercent: 0.015, takerFeePercent: 0,
+    maxPositionSizeBase: "0.1",
+  },
+  marketHealth: { priceable: true, status: "mark-available", markPrice: "100000" },
+};
+const accountRiskPayload = {
+  ok: true, readOnly: true, signerRequired: false, accountHealthAvailable: true,
+  accountHealthStatus: "available", readAt: new Date().toISOString(),
+  marketScope: { symbol: "BTC-USDso" },
+  positionsSource: "MarginBank active pools", positionsStatus: "available",
+  summary: {
+    equityUsdso: "100", unlockedCollateralUsdso: "95", lockedCollateralUsdso: "5",
+    withdrawableUsdso: "90", initialMarginRequirementUsdso: "10",
+    maintenanceMarginRequirementUsdso: "2.5", closeOutMarginRequirementUsdso: "1.25",
+    marginStatus: "Healthy", activePositionCount: 2,
+  },
+  positionCount: 2,
+  positions: [
+    { symbol: "BTC-USDso", poolAddress: "0x0000000000000000000000000000000000000001", side: "long", quantityBase: "0.001", entryPrice: "100000", markPrice: "100000", notionalUsdso: "100", unrealizedPnlUsdso: "1", accruedFundingOwedUsdso: "0.1", maintenanceMarginRequirementUsdso: "2.5", estimatedLiquidationPrice: "85000", liquidationPriceStatus: "sdk-estimate", priceable: true },
+    { symbol: "ETH-USDso", poolAddress: "0x0000000000000000000000000000000000000003", side: "short", quantityBase: "0.002", entryPrice: "2000", markPrice: "2000", notionalUsdso: "4", unrealizedPnlUsdso: "0.5", accruedFundingOwedUsdso: "0.01", maintenanceMarginRequirementUsdso: "0.1", estimatedLiquidationPrice: "2300", liquidationPriceStatus: "sdk-estimate", priceable: true },
+  ],
+};
+
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/markets", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
     body: JSON.stringify(marketPayload),
+  }));
+  await page.route("**/api/market-risk?**", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify(marketRiskPayload),
+  }));
+  await page.route("**/api/account-risk?**", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify(accountRiskPayload),
   }));
   await page.route("**/api/market-price?**", (route) => route.fulfill({
     status: 200,
@@ -217,4 +257,61 @@ test("exposes selected direction and shock presets to assistive technology", asy
   await expect(pullback).toHaveAttribute("aria-pressed", "true");
   await expect(severe).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator("#shock")).toHaveAttribute("aria-label", "Price shock percentage");
+});
+
+
+test("shows live protocol risk settings separately from the editable scenario price", async ({ page }) => {
+  await expect(page.locator("#market-risk-status")).toContainText("Protocol mark available");
+  await expect(page.locator("#market-risk-imf")).toHaveText("5.00%");
+  await expect(page.locator("#market-risk-maintenance")).toHaveText("2.50%");
+  await expect(page.locator("#market-risk-mark")).toHaveText("$100,000.00");
+  await expect(page.locator("#market-risk-note")).toContainText("Static risk limits");
+});
+
+test("read-only Account Risk Check displays cross-margin summary and multiple positions", async ({ page }) => {
+  await page.locator("#account-risk-address").fill("0x19393aEd711c5C17C8B62C4cB6Cc2c32A31B5f7A");
+  await page.locator("#account-risk-submit").click();
+  await expect(page.locator("#account-risk-status")).toContainText("Account snapshot loaded");
+  await expect(page.locator("#account-risk-equity")).toHaveText("$100.00");
+  await expect(page.locator("#account-risk-position-count")).toHaveText("2");
+  await expect(page.locator(".account-position-card")).toHaveCount(2);
+  await expect(page.locator(".account-position-card").first()).toContainText("SDK liquidation estimate");
+  await expect(page.locator(".account-risk-caveat")).toContainText("other market contributions are held constant");
+});
+
+test("preserves market risk parameters while marking a stale protocol price unavailable", async ({ page }) => {
+  await page.route("**/api/market-risk?**", (route) => route.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify({ ...marketRiskPayload, marketHealth: { priceable: false, status: "stale-or-unpriceable", markPrice: null } }),
+  }));
+  await page.locator("#refresh-data").click();
+  await expect(page.locator("#market-risk-status")).toHaveText("Mark stale or unpriceable");
+  await expect(page.locator("#market-risk-maintenance")).toHaveText("2.50%");
+  await expect(page.locator("#market-risk-mark")).toHaveText("Unavailable");
+  await expect(page.locator("#market-risk-note")).toContainText("Do not treat missing price data as zero");
+});
+
+test("rejects stale order-book references rather than presenting them as live", async ({ page }) => {
+  const staleQuote = {
+    ...pricePayload, referencePrice: 123456, bestBid: 123400, bestAsk: 123512,
+    timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+  };
+  await page.route("**/api/market-price?**", (route) => route.fulfill({
+    status: 200, contentType: "application/json", body: JSON.stringify(staleQuote),
+  }));
+  await page.reload();
+  await expect(page.locator("#market-hint")).toContainText("Live reference price unavailable");
+  await expect(page.locator("#entry")).toHaveValue("100000");
+  await expect(page.locator("#market-hint")).not.toContainText("Live book midpoint $123,456.00");
+});
+
+test("reports an unavailable account-risk endpoint without displaying a false healthy status", async ({ page }) => {
+  await page.route("**/api/account-risk?**", (route) => route.fulfill({
+    status: 502, contentType: "application/json",
+    body: JSON.stringify({ ok: false, error: "Account risk data is temporarily unavailable from the Hideki RPC/indexer. No risk verdict was produced; retry when data is healthy." }),
+  }));
+  await page.locator("#account-risk-address").fill("0x19393aEd711c5C17C8B62C4cB6Cc2c32A31B5f7A");
+  await page.locator("#account-risk-submit").click();
+  await expect(page.locator("#account-risk-status")).toContainText("No risk verdict was produced");
+  await expect(page.locator("#account-risk-results")).toBeHidden();
 });
