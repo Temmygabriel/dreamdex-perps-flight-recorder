@@ -48,7 +48,7 @@ async function ensureChain(provider: InjectedProvider) {
   const raw = await provider.request({ method: "eth_chainId" });
   if (Number(raw) === CHAIN_ID) return;
   try {
-    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0xc52f" }] });
+    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0xc4cf" }] });
   } catch (error) {
     const e = error as { code?: number };
     if (e.code !== 4902) throw new Error("Switch your wallet to Somnia Hideki testnet (chain 50383) before trading.");
@@ -71,8 +71,6 @@ async function connect() {
   walletAddress = accounts[0] as Address;
   const walletClient = createWalletClient({ account: walletAddress, chain: hidekiTestnet, transport: custom(provider as any) });
   exchange = new SomniaMarkets({ chain: hidekiTestnet, indexerUrl: INDEXER, wsRpcUrl: WS, addresses: SOMNIA_HIDEKI_TESTNET_ADDRESSES, walletClient } as any);
-  const chainId = await exchange.client.publicClient?.getChainId?.().catch?.(() => CHAIN_ID);
-  if (chainId != null && Number(chainId) !== CHAIN_ID) throw new Error("SDK RPC chain mismatch; trading disabled.");
   const markets = await exchange.client.listPerpMarkets() as any[];
   market = markets.find(row => String(row.baseSymbol ?? "").toUpperCase() === "BTC");
   if (!market) throw new Error("BTC Perps market is not available on Hideki.");
