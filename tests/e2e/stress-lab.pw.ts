@@ -82,9 +82,9 @@ test("starts with internally consistent default calculations and live-preview wo
   await expect(page.locator("#scenario-status")).toHaveText("LIVE PREVIEW");
   await expect(page.locator("#result-price")).toHaveText("90,000.00");
   await expect(page.locator("#result-pnl")).toHaveText("−100.00");
-  await expect(page.locator("#result-equity")).toHaveText("$0.00");
-  await expect(page.locator("#result-headroom")).toHaveText("−$22.50");
-  await expect(page.locator("#trace-equity-value")).toHaveText("$0.00");
+  await expect(page.locator("#result-equity")).toHaveText("0.00");
+  await expect(page.locator("#result-headroom")).toHaveText("−22.50");
+  await expect(page.locator("#trace-equity-value")).toHaveText("0.00");
 });
 
 test("prefills the selected market from a labelled read-only book midpoint", async ({ page }) => {
