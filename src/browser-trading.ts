@@ -53,11 +53,11 @@ async function ensureChain(provider: InjectedProvider) {
     const e = error as { code?: number };
     if (e.code !== 4902) throw new Error("Switch your wallet to Somnia Hideki testnet (chain 50383) before trading.");
     await provider.request({ method: "wallet_addEthereumChain", params: [{
-      chainId: "0xc52f", chainName: "Somnia Hideki Testnet",
+      chainId: "0xc4cf", chainName: "Somnia Hideki Testnet",
       nativeCurrency: { name: "STT", symbol: "STT", decimals: 18 },
       rpcUrls: [RPC], blockExplorerUrls: ["https://shannon-explorer.somnia.network"]
     }] });
-    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0xc52f" }] });
+    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0xc4cf" }] });
   }
   const switched = await provider.request({ method: "eth_chainId" });
   if (Number(switched) !== CHAIN_ID) throw new Error("Wallet network is not Somnia Hideki testnet. No order was submitted.");
