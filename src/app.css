@@ -626,3 +626,25 @@ html[data-theme="dim"] .paste-button{background:#222b35;border-color:#3c4855;col
 html[data-theme="dim"] .account-risk-status{background:#202832;border-color:#34404d;border-left-color:#82909e}
 html[data-theme="dim"] .bonus-number{background:#2b3923;color:#d9efb1;border-color:#4b6236}
 html[data-theme="dim"] .estimate-tag{background:#2b3923;border-color:#4b6236;color:#d9efb1}
+
+
+/* Browser wallet trading: deliberately separated from the read-only scenario model. */
+.wallet-trading-panel{margin-top:18px;padding:22px;scroll-margin-top:20px}
+.wallet-trading-warning{display:grid;gap:4px;padding:12px 14px;border:1px solid #8b6a3a66;background:#8b6a3a12;border-radius:9px;margin-bottom:17px}
+.wallet-trading-warning strong{color:#f0c783;font-size:12px}
+.wallet-trading-warning span,.wallet-trading-footnote{font-size:11px;color:var(--muted);line-height:1.7}
+.wallet-connect-row,.wallet-trading-state{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid var(--border-soft)}
+.wallet-connect-row>div{display:grid;gap:5px;min-width:0}
+.wallet-connect-row small{font:9px var(--mono);letter-spacing:1px;color:var(--muted)}
+.wallet-connect-row strong{font:12px var(--mono);overflow-wrap:anywhere}
+.wallet-trading-state span{font-size:11px;color:var(--muted)}
+.wallet-trading-state strong{font-size:12px;text-align:right}
+.wallet-order-preview{padding:12px 13px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;margin:16px 0;font:11px var(--mono);line-height:1.8;color:var(--text)}
+.wallet-trading-actions{display:flex;gap:10px;flex-wrap:wrap}
+.wallet-trading-actions .button{min-height:44px}
+.wallet-trading-actions button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.wallet-trade-status{font-size:12px;line-height:1.7;color:var(--muted);padding:11px 13px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border);overflow-wrap:anywhere}
+.wallet-trade-status[data-state="error"]{color:var(--red);border-color:#ff728a66}
+.wallet-trade-evidence a{display:inline-flex;align-items:center;min-height:44px;color:var(--purple-2);font-size:12px;text-decoration:underline}
+.wallet-trading-footnote{margin:13px 0 0}
+@media(max-width:600px){.wallet-trading-panel{padding:15px}.wallet-connect-row{align-items:flex-start;flex-direction:column}.wallet-connect-row .button{width:100%;min-height:44px}.wallet-trading-actions{display:grid;grid-template-columns:1fr}.wallet-trading-actions .button{width:100%}.wallet-trading-state{align-items:flex-start;flex-direction:column}.wallet-trading-state strong{text-align:left}}
