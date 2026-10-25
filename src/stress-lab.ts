@@ -5,7 +5,7 @@ type MarketRecord = { symbol?: string; name?: string; baseSymbol?: string; quote
 type Scenario = { createdAt:string; product:"Perps Stress Lab"; version:"0.1.0"; network:{name:string;chainId:number}; source:"manual-input"|"live-order-book-midpoint"; priceReference:{source:string;timestamp:string|null;bestBid:number|null;bestAsk:number|null}; side:Side; market:string; entryPrice:number; quantity:number; leverage:number; startingMarginPercent:number; startingMarginUsd:number; shockPercent:number; stressedPrice:number; pnlUsd:number; funding:{enabled:boolean;rate8hPercent:number;hourlySettlements:number;estimatedUsd:number;assumption:string}; equityUsd:number; maintenancePercent:number; maintenanceUsd:number; headroomUsd:number; thresholdStatus:"above-estimate"|"at-or-below-estimate"; assumptions:string[] };
 const $ = <T extends HTMLElement>(id:string) => document.getElementById(id) as T;
 const fmt = (n:number, digits=2) => Number.isFinite(n) ? new Intl.NumberFormat("en-US",{minimumFractionDigits:digits,maximumFractionDigits:digits}).format(n) : "—";
-const usd = (n:number) => (n < 0 ? "−$" : "$") + fmt(Math.abs(n));
+const usd = (n:number) => (n < 0 ? "−" : "") + fmt(Math.abs(n));
 const pct = (n:number) => (n > 0 ? "+" : n < 0 ? "−" : "") + fmt(Math.abs(n),1) + "%";
 let side:Side = "long";
 let markets:MarketRecord[] = [];
@@ -17,6 +17,23 @@ let marketPriceRequestId = 0;
 let marketRiskRequestId = 0;
 let accountRiskRequestId = 0;
 let priceReference: {source:string;timestamp:string|null;bestBid:number|null;bestAsk:number|null} = {source:"manual input",timestamp:null,bestBid:null,bestAsk:null};
+const scope = {
+ counted:[{name:"Entry price",detail:"The editable price used as the starting point for this hypothetical scenario."},{name:"Quantity",detail:"The position size used to calculate directional P&L and notional."},{name:"Leverage",detail:"Controls starting margin in this simplified model."},{name:"Maintenance margin %",detail:"A manual assumption used only for the scenario maintenance estimate."}],
+ zero_on_testnet:[{name:"Maker/taker fees · 0%",detail:"Maker and taker fees are documented as zero on the current testnet; protocol settings can change."}],
+ left_out:[{name:"Other open positions",detail:"Other positions can add gains or losses to the shared account."},{name:"Shared account equity",detail:"Real account collateral and equity are not included in this single-position estimate."},{name:"Liquidation fee",detail:"Documentation says liquidation fees can be up to 1% of notional closed."},{name:"Gas",detail:"Network transaction costs are not included in this estimate."},{name:"Stop-order costs",detail:"Stop-order costs are documented as 0.15 STT each."},{name:"Spread/slippage",detail:"Execution price can differ from the book midpoint due to spread and market impact."},{name:"Changing funding rates",detail:"Funding can change over time; the optional scenario uses a constant rate."},{name:"Liquidation execution",detail:"This model does not simulate the protocol's full liquidation process."}]
+};
+function openScopeModal(title:string,detail:string){setText("scope-modal-title",title);setText("scope-modal-copy",detail);$("scope-modal").hidden=false;$<HTMLButtonElement>("scope-modal-close").focus();}
+function renderScope(){
+ const funding=$<HTMLInputElement>("funding-toggle").checked;
+ setText("scope-counted",String(scope.counted.length+(funding?1:0)));
+ setText("scope-left-count",String(scope.left_out.length));
+ for(const [key,items] of Object.entries(scope)){
+  const root=$("scope-"+(key==="zero_on_testnet"?"zero":key==="left_out"?"left":"counted")+"-chips");
+  root.replaceChildren();
+  const list=key==="counted"&&funding?[...items,{name:"Funding (optional)",detail:"An optional constant 8-hour funding-rate assumption, simplified to hourly settlements."}]:items;
+  for(const item of list){const chip=document.createElement("button");chip.type="button";chip.className="scope-chip";chip.textContent=item.name;chip.addEventListener("click",()=>{setText("scope-chip-detail",item.detail);openScopeModal(item.name,item.detail);});root.append(chip);}
+ }
+}
 
 function num(id:string):number { return Number($<HTMLInputElement | HTMLSelectElement>(id).value); }
 function val(id:string):string { return $<HTMLInputElement | HTMLSelectElement>(id).value; }
@@ -107,10 +124,10 @@ function update(){
 }
 function markRun(){lastRunAt=null;update();if(!latest)return;lastRunAt=new Date().toISOString();setText("scenario-status","SCENARIO REVIEWED");$("results").scrollIntoView({behavior:"smooth",block:"start"});}
 function download(){
- try{const s=compute();latest=s;const report={...s,generatedAt:new Date().toISOString(),verification:{onChain:false,liveAccountDataUsed:false,transactionHash:null},disclaimer:"This is a local scenario estimate, not on-chain evidence, financial advice, an official liquidation price, or a prediction of protocol liquidation behavior."};const blob=new Blob([JSON.stringify(report,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="perps-stress-lab-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);setText("export-feedback","Scenario JSON exported. It is labelled as local, non-on-chain evidence.");}catch(e){setText("export-feedback",e instanceof Error?e.message:"Unable to export this scenario.");}
+ try{const s=compute();latest=s;const report={...s,scope:{counted:scope.counted.map(x=>x.name).concat(s.funding.enabled?["Funding (optional)"]:[]),zero_on_testnet:scope.zero_on_testnet.map(x=>x.name),left_out:scope.left_out.map(x=>x.name)},generatedAt:new Date().toISOString(),verification:{onChain:false,liveAccountDataUsed:false,transactionHash:null},disclaimer:"This is a local scenario estimate, not on-chain evidence, financial advice, an official liquidation price, or a prediction of protocol liquidation behavior."};const blob=new Blob([JSON.stringify(report,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="perps-stress-lab-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);setText("export-feedback","Scenario JSON exported. It is labelled as local, non-on-chain evidence.");}catch(e){setText("export-feedback",e instanceof Error?e.message:"Unable to export this scenario.");}
 }
 async function copySummary(){
- try{const s=compute();const summary=["PERPS STRESS LAB — SCENARIO SUMMARY","Network: Somnia Hideki testnet (50383)","Source: "+s.source+"; not on-chain evidence","Market: "+s.market,"Direction: "+s.side.toUpperCase(),"Entry: "+usd(s.entryPrice),"Quantity: "+fmt(s.quantity,8),"Shock: "+pct(s.shockPercent),"Stressed price: "+usd(s.stressedPrice),"Estimated P&L: "+usd(s.pnlUsd),"Estimated equity: "+usd(s.equityUsd),"Maintenance estimate: "+usd(s.maintenanceUsd),"Headroom: "+usd(s.headroomUsd),"Funding estimate: "+usd(s.funding.estimatedUsd),"","This simplified single-position estimate excludes cross-margin offsets, account-wide collateral, liquidation fees and gas costs, full protocol accounting and liquidation execution."].join("\n");await navigator.clipboard.writeText(summary);setText("export-feedback","Readable scenario summary copied.");}catch{setText("export-feedback","Clipboard access failed. Use Export scenario JSON instead.");}
+ try{const s=compute();const summary=["PERPS STRESS LAB — SCENARIO SUMMARY","Network: Somnia Hideki testnet (50383)","Source: "+s.source+"; not on-chain evidence","Market: "+s.market,"Direction: "+s.side.toUpperCase(),"Entry: "+usd(s.entryPrice),"Quantity: "+fmt(s.quantity,8),"Shock: "+pct(s.shockPercent),"Stressed price: "+usd(s.stressedPrice),"Estimated P&L: "+usd(s.pnlUsd),"Estimated equity: "+usd(s.equityUsd),"Maintenance estimate: "+usd(s.maintenanceUsd),"Headroom: "+usd(s.headroomUsd),"Funding estimate: "+usd(s.funding.estimatedUsd),"","scope.counted: "+scope.counted.map(x=>x.name).concat(s.funding.enabled?["Funding (optional)"]:[]).join(", "),"scope.zero_on_testnet: "+scope.zero_on_testnet.map(x=>x.name).join(", "),"scope.left_out: "+scope.left_out.map(x=>x.name).join(", "),"","This simplified single-position estimate excludes cross-margin offsets, account-wide collateral, liquidation fees and gas costs, full protocol accounting and liquidation execution."].join("\n");await navigator.clipboard.writeText(summary);setText("export-feedback","Readable scenario summary copied.");}catch{setText("export-feedback","Clipboard access failed. Use Export scenario JSON instead.");}
 }
 async function loadMarketPrice(symbol:string){
  const requestId=++marketPriceRequestId;
@@ -198,8 +215,9 @@ async function loadMarketRisk(symbol:string){
   setText("market-risk-maintenance",percent(risk.maintenanceMarginPercent));
   setText("market-risk-closeout",percent(risk.closeOutMarginPercent));
   setText("market-risk-fees",risk.makerFeePercent==null||risk.takerFeePercent==null?"Unavailable":fmt(Number(risk.makerFeePercent),3)+"% / "+fmt(Number(risk.takerFeePercent),3)+"%");
-  setText("market-risk-max-position",risk.maxPositionSizeBase==null?"Unavailable":fmt(Number(risk.maxPositionSizeBase),8)+" "+String(payload.baseSymbol??""));
+  setText("market-risk-max-position",risk.maxPositionSizeBase==null?"Unavailable":Number(risk.maxPositionSizeBase).toLocaleString("en-US",{maximumFractionDigits:8})+" "+String(payload.baseSymbol??""));
   setText("market-risk-mark",health.priceable===true&&health.markPrice!=null?usd(Number(health.markPrice)):"Unavailable");
+   if(health.priceable===true&&health.markPrice!=null&&priceReference.bestBid!=null&&priceReference.bestAsk!=null){const midpoint=(priceReference.bestBid+priceReference.bestAsk)/2,mark=Number(health.markPrice),diff=(midpoint-mark)/mark*100;const note=$("price-difference-note");note.hidden=false;setText("price-difference-note","Book midpoint is "+(diff>=0?fmt(diff,2)+"% above":fmt(Math.abs(diff),2)+"% below")+" the protocol mark. Entry starts at the midpoint (editable). Liquidation logic uses the protocol mark.");}else $("price-difference-note").hidden=true;
   if(health.priceable===true){
    card.dataset.state="ready";
    const readAt=payload.readAt?new Date(payload.readAt):null;
