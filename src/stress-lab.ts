@@ -409,12 +409,21 @@ document.querySelectorAll<HTMLButtonElement>("[data-shock]").forEach(b=>b.addEve
  update();
  if(id==="market"){void loadMarketPrice(val("market"));void loadMarketRisk(val("market"));}
 }));
-$("funding-toggle").addEventListener("change",()=>{lastRunAt=null;const enabled=$<HTMLInputElement>("funding-toggle").checked; $("funding-fields").setAttribute("aria-disabled",String(!enabled));$<HTMLInputElement>("funding-rate").disabled=!enabled;$<HTMLSelectElement>("funding-periods").disabled=!enabled;update();});
+$("funding-toggle").addEventListener("change",()=>{renderScope();lastRunAt=null;const enabled=$<HTMLInputElement>("funding-toggle").checked; $("funding-fields").setAttribute("aria-disabled",String(!enabled));$<HTMLInputElement>("funding-rate").disabled=!enabled;$<HTMLSelectElement>("funding-periods").disabled=!enabled;update();});
 $<HTMLSelectElement>("leverage").addEventListener("change",()=>{if(val("leverage")==="custom")return;lastRunAt=null;$<HTMLInputElement>("starting-margin").value=String(100/num("leverage"));update();});
 $("run-scenario").addEventListener("click",markRun);
 $("export-json").addEventListener("click",download);
 $("copy-summary").addEventListener("click",()=>void copySummary());
 $("refresh-data").addEventListener("click",()=>void loadMarkets());
 $("account-risk-form").addEventListener("submit",(event)=>{event.preventDefault();void runAccountRisk();});
+const walletInput=$<HTMLInputElement>("account-risk-address");const walletSubmit=$<HTMLButtonElement>("account-risk-submit");
+const validateWallet=()=>{const value=walletInput.value.trim();const valid=/^0x[a-fA-F0-9]{40}$/.test(value);const touched=value.length>0;walletInput.setAttribute("aria-invalid",String(touched&&!valid));walletSubmit.disabled=!valid;setText("account-risk-validity",valid?"✓":"");$("account-risk-validity").classList.toggle("valid",valid);$("account-risk-validity").classList.toggle("invalid",touched&&!valid);setText("account-risk-address-hint",touched&&!valid?"Invalid address. Use 0x followed by exactly 40 hexadecimal characters.":"Enter a 42-character EVM address beginning with 0x.");};walletInput.addEventListener("input",validateWallet);
+$("account-risk-paste").addEventListener("click",async()=>{try{walletInput.value=await navigator.clipboard.readText();validateWallet();walletInput.focus();}catch{setText("account-risk-address-hint","Clipboard access unavailable. Paste the public address into the field manually.");}});
+$("scope-toggle").addEventListener("click",()=>{const button=$<HTMLButtonElement>("scope-toggle");const expanded=button.getAttribute("aria-expanded")!=="true";button.setAttribute("aria-expanded",String(expanded));$("scope-details").hidden=!expanded;setText("scope-chevron",expanded?"▴":"▾");});
+$("scope-bridge").addEventListener("click",()=>{$("account-risk").scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});window.setTimeout(()=>walletInput.focus({preventScroll:true}),250);});
+document.querySelectorAll<HTMLElement>("[data-scope-open]").forEach(el=>el.addEventListener("click",()=>openScopeModal("Estimate · USDso","This value is a local single-position estimate, not withdrawable USD or a liquidation prediction. Open Scope to inspect counted factors and exclusions.")));
+$("scope-modal-close").addEventListener("click",()=>{$("scope-modal").hidden=true;});$("scope-modal").addEventListener("click",(event)=>{if(event.target===$("scope-modal"))$("scope-modal").hidden=true;});
+renderScope();
+
 loadMarkets();
 update();
