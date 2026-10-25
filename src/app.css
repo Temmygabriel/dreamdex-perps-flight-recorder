@@ -522,3 +522,37 @@ html[data-theme="dim"] select:disabled{color:#82909e}
  html[data-theme="dim"] .nav-item{background:#202832;border-color:#35414e}
  html[data-theme="dim"] .nav-item.active{background:#2b3923;border-color:#4b6236}
 }
+
+
+/* Targeted clarity pass: communicate provenance and unavailable states without changing the vetted layout. */
+.assumption-help{
+ display:block;
+ margin-top:7px;
+ padding:8px 10px;
+ border-left:3px solid #a8cf4b;
+ border-radius:0 6px 6px 0;
+ background:#f5f9eb;
+ color:#586981;
+ font-size:10px;
+ line-height:1.65;
+}
+#live-risk-card[data-state="loading"]{border-style:dashed}
+#live-risk-card[data-state="ready"]{border-color:#cfe1a6}
+#live-risk-card[data-state="stale"]{border-color:#e6d2a7;background:#fffaf0}
+#live-risk-card[data-state="error"]{border-color:#e6c2c5;background:#fff7f7}
+#live-risk-card[data-freshness="aging"] .live-risk-head small{color:#986a19}
+#live-risk-card[data-state="stale"] .live-risk-head small,
+#live-risk-card[data-state="error"] .live-risk-head small{font-weight:700}
+#account-risk-status[data-state="ready"]{border-left-color:#78ad42}
+#account-risk-status[data-state="warning"]{border-left-color:#d3a23a;background:#fff9ec}
+#account-risk-status[data-state="error"]{border-left-color:#c85c64;background:#fff6f6}
+html[data-theme="dim"] .assumption-help{background:#273124;border-left-color:#b8dc69;color:#c3cdbb}
+html[data-theme="dim"] #live-risk-card[data-state="ready"]{border-color:#506642}
+html[data-theme="dim"] #live-risk-card[data-state="stale"]{border-color:#6c5735;background:#29271f}
+html[data-theme="dim"] #live-risk-card[data-state="error"]{border-color:#6c3f45;background:#2a2225}
+html[data-theme="dim"] #account-risk-status[data-state="warning"]{background:#302b20}
+html[data-theme="dim"] #account-risk-status[data-state="error"]{background:#302326}
+@media(max-width:760px){
+ .assumption-help{font-size:10px}
+ #live-risk-card .live-risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
